@@ -27,8 +27,7 @@ export function extractPaperLinks(content: string): { arxivIds: string[]; dois: 
   while ((match = doiRegex.exec(content)) !== null) {
     dois.push(match[1]);
   }
-
-  return { arxivIds: [...new Set(arxivIds)], dois: [...new Set(dois)] };
+  return { arxivIds: Array.from(new Set(arxivIds)), dois: Array.from(new Set(dois)) };
 }
 
 export async function fetchArxivMetadata(arxivId: string): Promise<PaperMetadata | null> {
