@@ -288,10 +288,26 @@ export function extractDoiFromUrl(url: string): string | null {
   }
 }
 
+interface ScrapedMetadata {
+  doi?: string;
+  title?: string;
+  authors?: string[];
+  abstract?: string;
+  publishedDate?: string;
+}
+
 /**
- * Fetch meta tags from a URL to find DOI
+ * Fetch and parse meta tags from a URL
  */
 export async function fetchMetaTagsFromUrl(url: string): Promise<string | null> {
+  const scraped = await scrapeMetadataFromUrl(url);
+  return scraped?.doi || null;
+}
+
+/**
+ * Scrape metadata from a publisher page using meta tags
+ */
+export async function scrapeMetadataFromUrl(url: string): Promise<ScrapedMetadata | null> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -312,48 +328,120 @@ export async function fetchMetaTagsFromUrl(url: string): Promise<string | null> 
     }
 
     const html = await response.text();
+    const result: ScrapedMetadata = {};
 
-    // Try various meta tag patterns for DOI
-    const metaPatterns = [
-      // citation_doi
+    // Extract DOI
+    const doiPatterns = [
       /<meta[^>]*name=["']citation_doi["'][^>]*content=["']([^"']+)["']/i,
       /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']citation_doi["']/i,
-
-      // dc.identifier with DOI
       /<meta[^>]*name=["']dc\.identifier["'][^>]*content=["'](?:doi:)?(10\.[^"']+)["']/i,
       /<meta[^>]*content=["'](?:doi:)?(10\.[^"']+)["'][^>]*name=["']dc\.identifier["']/i,
-
-      // DOI meta tag
       /<meta[^>]*name=["']DOI["'][^>]*content=["']([^"']+)["']/i,
       /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']DOI["']/i,
-
-      // prism.doi
       /<meta[^>]*name=["']prism\.doi["'][^>]*content=["']([^"']+)["']/i,
-
-      // og:url containing doi.org
       /<meta[^>]*property=["']og:url["'][^>]*content=["'][^"']*doi\.org\/(10\.[^"']+)["']/i,
-
-      // bepress_citation_doi
       /<meta[^>]*name=["']bepress_citation_doi["'][^>]*content=["']([^"']+)["']/i,
     ];
 
-    for (const pattern of metaPatterns) {
+    for (const pattern of doiPatterns) {
       const match = html.match(pattern);
-      if (match && match[1]) {
-        const doi = match[1].trim();
-        // Validate it looks like a DOI
-        if (doi.startsWith('10.')) {
-          return doi;
-        }
+      if (match && match[1]?.startsWith('10.')) {
+        result.doi = match[1].trim();
+        break;
       }
     }
 
-    return null;
+    // Extract title
+    const titlePatterns = [
+      /<meta[^>]*name=["']citation_title["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']citation_title["']/i,
+      /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i,
+      /<meta[^>]*name=["']dc\.title["'][^>]*content=["']([^"']+)["']/i,
+      /<title>([^<]+)<\/title>/i,
+    ];
+
+    for (const pattern of titlePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        result.title = decodeHtmlEntities(match[1].trim());
+        break;
+      }
+    }
+
+    // Extract authors
+    const authorPattern = /<meta[^>]*name=["']citation_author["'][^>]*content=["']([^"']+)["']/gi;
+    const authorPattern2 = /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']citation_author["']/gi;
+    const authors: string[] = [];
+
+    let authorMatch;
+    while ((authorMatch = authorPattern.exec(html)) !== null) {
+      authors.push(decodeHtmlEntities(authorMatch[1].trim()));
+    }
+    while ((authorMatch = authorPattern2.exec(html)) !== null) {
+      authors.push(decodeHtmlEntities(authorMatch[1].trim()));
+    }
+
+    if (authors.length > 0) {
+      result.authors = authors;
+    }
+
+    // Extract abstract/description
+    const abstractPatterns = [
+      /<meta[^>]*name=["']citation_abstract["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']citation_abstract["']/i,
+      /<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i,
+      /<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i,
+    ];
+
+    for (const pattern of abstractPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        result.abstract = decodeHtmlEntities(match[1].trim());
+        break;
+      }
+    }
+
+    // Extract publication date
+    const datePatterns = [
+      /<meta[^>]*name=["']citation_publication_date["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']citation_publication_date["']/i,
+      /<meta[^>]*name=["']citation_date["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*name=["']dc\.date["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*name=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*property=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        result.publishedDate = match[1].trim();
+        break;
+      }
+    }
+
+    return result;
   } catch (error) {
     clearTimeout(timeoutId);
-    // Timeout or network error - fail silently
     return null;
   }
+}
+
+/**
+ * Decode HTML entities in a string
+ */
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num, 10)))
+    .replace(/&#x([a-fA-F0-9]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
 /**
@@ -362,15 +450,51 @@ export async function fetchMetaTagsFromUrl(url: string): Promise<string | null> 
 export async function resolveUrlToPaper(url: string): Promise<PaperMetadata | null> {
   // Fast path: try to extract DOI from URL pattern
   let doi = extractDoiFromUrl(url);
+  let scrapedData: ScrapedMetadata | null = null;
 
   // Slow path: fetch page and look for meta tags
   if (!doi) {
-    doi = await fetchMetaTagsFromUrl(url);
+    scrapedData = await scrapeMetadataFromUrl(url);
+    doi = scrapedData?.doi || null;
   }
 
-  // If we found a DOI, fetch metadata
+  // If we found a DOI, try Crossref first
   if (doi) {
-    return fetchDoiMetadata(doi);
+    const crossrefMetadata = await fetchDoiMetadata(doi);
+    if (crossrefMetadata) {
+      return crossrefMetadata;
+    }
+
+    // Crossref failed (paper too new), use scraped data as fallback
+    if (!scrapedData) {
+      scrapedData = await scrapeMetadataFromUrl(url);
+    }
+
+    if (scrapedData && scrapedData.title) {
+      return {
+        identifier: doi,
+        identifierType: 'doi',
+        title: scrapedData.title,
+        authors: scrapedData.authors || [],
+        abstract: scrapedData.abstract || null,
+        publishedDate: scrapedData.publishedDate || null,
+        url: `https://doi.org/${doi}`,
+      };
+    }
+  }
+
+  // No DOI but we have scraped metadata with a title
+  if (scrapedData && scrapedData.title) {
+    // Use URL as identifier since we don't have a DOI
+    return {
+      identifier: url,
+      identifierType: 'doi', // Treat as DOI type for display purposes
+      title: scrapedData.title,
+      authors: scrapedData.authors || [],
+      abstract: scrapedData.abstract || null,
+      publishedDate: scrapedData.publishedDate || null,
+      url: url,
+    };
   }
 
   return null;
