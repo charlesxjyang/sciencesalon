@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { extractPaperLinks, fetchPaperMetadata } from "@/lib/papers";
+import { extractPaperLinks, fetchPaperMetadata, resolveUrlToPaper } from "@/lib/papers";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Extract and fetch paper metadata
-    const { arxivIds, dois } = extractPaperLinks(content);
+    const { arxivIds, dois, urls } = extractPaperLinks(content);
     const paperPromises: Promise<any>[] = [];
 
     for (const arxivId of arxivIds) {
@@ -63,12 +63,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const papers = (await Promise.all(paperPromises)).filter(Boolean);
+    // Process generic URLs (with timeout protection)
+    for (const url of urls) {
+      paperPromises.push(
+        resolveUrlToPaper(url)
+          .then((metadata) => (metadata ? { ...metadata, postId: post.id } : null))
+          .catch((error) => {
+            console.error(`Error resolving URL ${url}:`, error);
+            return null;
+          })
+      );
+    }
+
+    // Use allSettled to ensure slow URLs don't block post creation
+    const results = await Promise.allSettled(paperPromises);
+    const papers = results
+      .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+      .map((r) => r.value)
+      .filter(Boolean);
+
+    // Deduplicate by identifier (in case URL resolved to same DOI as explicit DOI)
+    const seenIdentifiers = new Set<string>();
+    const uniquePapers = papers.filter((paper) => {
+      if (seenIdentifiers.has(paper.identifier)) {
+        return false;
+      }
+      seenIdentifiers.add(paper.identifier);
+      return true;
+    });
 
     // Insert paper mentions
-    if (papers.length > 0) {
+    if (uniquePapers.length > 0) {
       const { error: papersError } = await supabase.from("paper_mentions").insert(
-        papers.map((paper) => ({
+        uniquePapers.map((paper) => ({
           post_id: paper.postId,
           identifier: paper.identifier,
           identifier_type: paper.identifierType,
