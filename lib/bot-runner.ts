@@ -98,6 +98,9 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
   return result;
 }
 
+// Only these categories are allowed (Vercel hobby plan limits cron jobs)
+const ALLOWED_CATEGORIES = ["quant-ph", "cs.RO"];
+
 /**
  * Run all bots
  */
@@ -105,10 +108,11 @@ export async function runAllBots(): Promise<BotRunResult[]> {
   const supabase = createServiceRoleClient();
   const results: BotRunResult[] = [];
 
-  // Fetch all bots
+  // Fetch only bots with allowed categories
   const { data: bots, error } = await supabase
     .from("bots")
-    .select("*");
+    .select("*")
+    .in("category", ALLOWED_CATEGORIES);
 
   if (error) {
     throw new Error(`Failed to fetch bots: ${error.message}`);
