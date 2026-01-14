@@ -1,7 +1,81 @@
 // Regex patterns for detecting paper links
-export const ARXIV_PATTERN = /(?:arxiv\.org\/abs\/|arxiv:)(\d{4}\.\d{4,5}(?:v\d+)?)/gi;
+// arXiv: supports /abs/, /pdf/, and arxiv: prefix
+export const ARXIV_PATTERN = /(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:)(\d{4}\.\d{4,5}(?:v\d+)?)/gi;
 export const DOI_PATTERN = /(?:doi\.org\/|doi:)(10\.\d{4,}\/[^\s]+)/gi;
 export const URL_PATTERN = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+// Preprint server patterns (extract ID and convert to DOI or fetch metadata)
+export const PREPRINT_PATTERNS: {
+  name: string;
+  pattern: RegExp;
+  doiPrefix?: string;
+  fetchUrl?: (id: string) => string;
+}[] = [
+  // bioRxiv: biorxiv.org/content/10.1101/2024.01.01.123456
+  {
+    name: 'biorxiv',
+    pattern: /biorxiv\.org\/content\/(10\.1101\/[\d.]+)/gi,
+  },
+  // medRxiv: medrxiv.org/content/10.1101/2024.01.01.123456
+  {
+    name: 'medrxiv',
+    pattern: /medrxiv\.org\/content\/(10\.1101\/[\d.]+)/gi,
+  },
+  // chemRxiv: chemrxiv.org/engage/chemrxiv/article-details/xxx
+  {
+    name: 'chemrxiv',
+    pattern: /chemrxiv\.org\/engage\/chemrxiv\/article-details\/([a-f0-9]+)/gi,
+    fetchUrl: (id: string) => `https://chemrxiv.org/engage/chemrxiv/article-details/${id}`,
+  },
+  // OSF Preprints: osf.io/preprints/xxx or osf.io/xxx
+  {
+    name: 'osf',
+    pattern: /osf\.io\/(?:preprints\/\w+\/)?([a-z0-9]+)/gi,
+    fetchUrl: (id: string) => `https://osf.io/${id}`,
+  },
+  // SSRN: ssrn.com/abstract=123456 or papers.ssrn.com/sol3/papers.cfm?abstract_id=123456
+  {
+    name: 'ssrn',
+    pattern: /ssrn\.com\/(?:abstract=|sol3\/papers\.cfm\?abstract_id=)(\d+)/gi,
+    doiPrefix: '10.2139/ssrn.',
+  },
+  // Research Square: researchsquare.com/article/rs-123456/v1
+  {
+    name: 'researchsquare',
+    pattern: /researchsquare\.com\/article\/(rs-\d+)/gi,
+    doiPrefix: '10.21203/rs.3.',
+  },
+  // Zenodo: zenodo.org/record/123456 or zenodo.org/records/123456
+  {
+    name: 'zenodo',
+    pattern: /zenodo\.org\/records?\/(\d+)/gi,
+    doiPrefix: '10.5281/zenodo.',
+  },
+  // EarthArXiv: eartharxiv.org/repository/view/123/
+  {
+    name: 'eartharxiv',
+    pattern: /eartharxiv\.org\/repository\/view\/(\d+)/gi,
+    fetchUrl: (id: string) => `https://eartharxiv.org/repository/view/${id}/`,
+  },
+  // PsyArXiv: psyarxiv.com/xxx
+  {
+    name: 'psyarxiv',
+    pattern: /psyarxiv\.com\/([a-z0-9]+)/gi,
+    doiPrefix: '10.31234/osf.io/',
+  },
+  // SocArXiv: osf.io/preprints/socarxiv/xxx
+  {
+    name: 'socarxiv',
+    pattern: /osf\.io\/preprints\/socarxiv\/([a-z0-9]+)/gi,
+    doiPrefix: '10.31235/osf.io/',
+  },
+  // engrXiv: engrxiv.org/preprint/view/xxx
+  {
+    name: 'engrxiv',
+    pattern: /engrxiv\.org\/preprint\/view\/(\d+)/gi,
+    fetchUrl: (id: string) => `https://engrxiv.org/preprint/view/${id}`,
+  },
+];
 
 // Domains to skip (not papers)
 const NON_PAPER_DOMAINS = [
@@ -98,17 +172,44 @@ export function extractPaperLinks(content: string): {
   const arxivIds: string[] = [];
   const dois: string[] = [];
   const urls: string[] = [];
+  const processedDomains = new Set<string>();
 
   let match;
 
+  // Extract arXiv IDs
   const arxivRegex = new RegExp(ARXIV_PATTERN.source, 'gi');
   while ((match = arxivRegex.exec(content)) !== null) {
     arxivIds.push(match[1]);
   }
 
+  // Extract DOIs
   const doiRegex = new RegExp(DOI_PATTERN.source, 'gi');
   while ((match = doiRegex.exec(content)) !== null) {
     dois.push(match[1]);
+  }
+
+  // Extract preprint server links and convert to DOIs where possible
+  for (const preprint of PREPRINT_PATTERNS) {
+    const preprintRegex = new RegExp(preprint.pattern.source, 'gi');
+    while ((match = preprintRegex.exec(content)) !== null) {
+      const id = match[1];
+      if (preprint.doiPrefix) {
+        // Convert to DOI
+        dois.push(preprint.doiPrefix + id);
+      } else if (id.startsWith('10.')) {
+        // Already a DOI (e.g., biorxiv, medrxiv)
+        dois.push(id);
+      }
+      // Mark this domain as processed so we don't add it to generic URLs
+      try {
+        const urlMatch = match[0].match(/https?:\/\/([^/]+)/);
+        if (urlMatch) {
+          processedDomains.add(urlMatch[1].toLowerCase());
+        }
+      } catch {
+        // Ignore parsing errors
+      }
+    }
   }
 
   // Extract generic URLs
@@ -125,6 +226,11 @@ export function extractPaperLinks(content: string): {
 
       // Skip if already captured as arxiv or doi.org
       if (hostname.includes('arxiv.org') || hostname.includes('doi.org')) {
+        continue;
+      }
+
+      // Skip if already processed as a preprint server
+      if ([...processedDomains].some((d) => hostname.includes(d))) {
         continue;
       }
 
