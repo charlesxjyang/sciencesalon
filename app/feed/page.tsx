@@ -19,13 +19,15 @@ export default async function FeedPage() {
   const user = JSON.parse(userCookie.value);
   const supabase = createServerSupabaseClient();
 
-  // Fetch posts with authors and paper mentions
-  const { data: posts, error } = await supabase
+  // Fetch posts with authors, paper mentions, comments, and likes
+  const { data: rawPosts, error } = await supabase
     .from("posts")
     .select(`
       *,
       author:users!posts_author_orcid_fkey(*),
-      paper_mentions(*)
+      paper_mentions(*),
+      comments(*, author:users!comments_author_orcid_fkey(*)),
+      likes(user_orcid)
     `)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -33,6 +35,15 @@ export default async function FeedPage() {
   if (error) {
     console.error("Error fetching posts:", error);
   }
+
+  // Add counts and user-specific data to each post
+  const posts = rawPosts?.map((post) => ({
+    ...post,
+    comments_count: post.comments?.length || 0,
+    likes_count: post.likes?.length || 0,
+    user_liked: post.likes?.some((like: { user_orcid: string }) => like.user_orcid === user.orcid_id) || false,
+    likes: undefined,
+  }));
 
   return (
     <div className="min-h-screen">
@@ -68,7 +79,7 @@ export default async function FeedPage() {
         <div className="mt-8 space-y-6">
           {posts && posts.length > 0 ? (
             posts.map((post) => (
-              <PostCard key={post.id} post={post as Post} />
+              <PostCard key={post.id} post={post as Post} currentUser={user} />
             ))
           ) : (
             <div className="text-center py-12 text-ink/40">

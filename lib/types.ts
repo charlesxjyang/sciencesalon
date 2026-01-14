@@ -13,6 +13,26 @@ export interface Post {
   updated_at: string;
   author?: User;
   paper_mentions?: PaperMention[];
+  comments?: Comment[];
+  comments_count?: number;
+  likes_count?: number;
+  user_liked?: boolean;
+}
+
+export interface Like {
+  id: string;
+  post_id: string;
+  user_orcid: string;
+  created_at: string;
+}
+
+export interface Comment {
+  id: string;
+  post_id: string;
+  author_orcid: string;
+  content: string;
+  created_at: string;
+  author?: User;
 }
 
 export interface PaperMention {

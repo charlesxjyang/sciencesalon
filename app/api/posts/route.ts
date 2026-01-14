@@ -97,14 +97,20 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("salon_user");
+  const currentUserOrcid = userCookie ? JSON.parse(userCookie.value).orcid_id : null;
+
   const supabase = createServiceRoleClient();
 
-  const { data: posts, error } = await supabase
+  const { data: rawPosts, error } = await supabase
     .from("posts")
     .select(`
       *,
       author:users!posts_author_orcid_fkey(*),
-      paper_mentions(*)
+      paper_mentions(*),
+      comments(*, author:users!comments_author_orcid_fkey(*)),
+      likes(user_orcid)
     `)
     .order("created_at", { ascending: false })
     .limit(50);
@@ -115,6 +121,17 @@ export async function GET() {
       { status: 500 }
     );
   }
+
+  // Add counts and user-specific data to each post
+  const posts = rawPosts?.map((post) => ({
+    ...post,
+    comments_count: post.comments?.length || 0,
+    likes_count: post.likes?.length || 0,
+    user_liked: currentUserOrcid
+      ? post.likes?.some((like: { user_orcid: string }) => like.user_orcid === currentUserOrcid)
+      : false,
+    likes: undefined,
+  }));
 
   return NextResponse.json(posts);
 }

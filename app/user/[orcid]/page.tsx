@@ -25,22 +25,35 @@ export default async function UserPage({ params }: UserPageProps) {
     notFound();
   }
 
-  // Fetch user's posts
-  const { data: posts, error: postsError } = await supabase
+  // Get current user for header
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("salon_user");
+  const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
+
+  // Fetch user's posts with comments and likes
+  const { data: rawPosts, error: postsError } = await supabase
     .from("posts")
     .select(`
       *,
       author:users!posts_author_orcid_fkey(*),
-      paper_mentions(*)
+      paper_mentions(*),
+      comments(*, author:users!comments_author_orcid_fkey(*)),
+      likes(user_orcid)
     `)
     .eq("author_orcid", params.orcid)
     .order("created_at", { ascending: false })
     .limit(50);
 
-  // Get current user for header
-  const cookieStore = cookies();
-  const userCookie = cookieStore.get("salon_user");
-  const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
+  // Add counts and user-specific data to each post
+  const posts = rawPosts?.map((post) => ({
+    ...post,
+    comments_count: post.comments?.length || 0,
+    likes_count: post.likes?.length || 0,
+    user_liked: currentUser
+      ? post.likes?.some((like: { user_orcid: string }) => like.user_orcid === currentUser.orcid_id)
+      : false,
+    likes: undefined,
+  }));
 
   return (
     <div className="min-h-screen">
@@ -100,7 +113,7 @@ export default async function UserPage({ params }: UserPageProps) {
         <div className="space-y-6">
           {posts && posts.length > 0 ? (
             posts.map((post) => (
-              <PostCard key={post.id} post={post as Post} />
+              <PostCard key={post.id} post={post as Post} currentUser={currentUser} />
             ))
           ) : (
             <p className="text-center py-12 text-ink/40">
