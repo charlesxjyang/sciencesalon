@@ -19,11 +19,15 @@ export async function GET(request: NextRequest) {
 
   try {
     // Exchange code for token
+    console.log("Starting token exchange...");
     const tokenData = await exchangeCodeForToken(code);
+    console.log("Token data received:", JSON.stringify(tokenData));
     const { access_token, orcid } = tokenData;
 
     // Get user profile from ORCID
+    console.log("Fetching profile for:", orcid);
     const profile = await getOrcidProfile(orcid, access_token);
+    console.log("Profile:", JSON.stringify(profile));
 
     if (!profile) {
       return NextResponse.redirect(
@@ -50,7 +54,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Create redirect response and set cookies on it
-    const response = NextResponse.redirect(new URL("/feed", request.url));
+    console.log("Setting cookies for user:", profile.orcidId);
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://salon.science";
+    const response = NextResponse.redirect(new URL("/feed", appUrl));
     
     const cookieOptions = {
       httpOnly: false,
@@ -58,6 +64,7 @@ export async function GET(request: NextRequest) {
       sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",
+      domain: "salon.science",
     };
 
     response.cookies.set("salon_user", JSON.stringify({
