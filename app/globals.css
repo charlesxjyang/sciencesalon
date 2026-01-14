@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    @apply bg-cream text-ink;
+  }
+}
+
+@layer components {
+  .paper-card {
+    @apply bg-paper border border-sage/20 rounded-lg p-4 hover:border-sage/40 transition-colors;
+  }
+  
+  .btn-primary {
+    @apply bg-ink text-cream px-4 py-2 rounded-md hover:bg-ink/90 transition-colors font-sans text-sm;
+  }
+  
+  .btn-secondary {
+    @apply border border-ink/20 px-4 py-2 rounded-md hover:border-ink/40 transition-colors font-sans text-sm;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-cream;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-sage/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-sage/50;
+}
