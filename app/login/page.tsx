@@ -9,7 +9,7 @@ export default function LoginPage() {
             <span className="text-sage">&#9670;</span> Salon
           </Link>
           <p className="mt-2 text-ink/60">
-            Sign in to join the conversation
+            Sign in
           </p>
         </div>
 
@@ -28,7 +28,7 @@ export default function LoginPage() {
                 fill="#fff"
               />
             </svg>
-            <span className="font-medium">Sign in with ORCID</span>
+            <span className="font-medium">Login</span>
           </a>
 
           <div className="relative">

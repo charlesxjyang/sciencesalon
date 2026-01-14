@@ -69,6 +69,11 @@ export function PostCard({ post, currentUser }: PostCardProps) {
             >
               {post.author?.name || "Unknown"}
             </Link>
+            {post.author?.is_bot && (
+              <span className="px-1.5 py-0.5 text-xs bg-sage/10 text-sage rounded">
+                Bot
+              </span>
+            )}
             <span className="text-sm text-ink/40">{timeAgo}</span>
           </div>
           <div className="whitespace-pre-wrap break-words">{post.content}</div>

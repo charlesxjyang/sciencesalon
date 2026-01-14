@@ -25,7 +25,7 @@ export default async function Home() {
             </div>
           ) : (
             <Link href="/login" className="btn-primary">
-              Sign in with ORCID
+              Sign in
             </Link>
           )}
         </div>
@@ -44,7 +44,7 @@ export default async function Home() {
           </p>
           {!user && (
             <Link href="/login" className="btn-primary text-lg px-6 py-3">
-              Join with your ORCID
+              Join the Salon
             </Link>
           )}
         </div>
@@ -56,7 +56,7 @@ export default async function Home() {
           <div className="grid md:grid-cols-3 gap-12">
             <div>
               <h3 className="font-sans text-sm uppercase tracking-wide text-sage mb-3">
-                Researcher-only
+                For Scientists & Researchers
               </h3>
               <p className="text-ink/70">
                 Sign in with your ORCID. Everyone here is a working scientist.
@@ -86,7 +86,7 @@ export default async function Home() {
       <footer className="border-t border-ink/10">
         <div className="max-w-4xl mx-auto px-6 py-8">
           <p className="text-sm text-ink/40">
-            Salon · Inspired by the Republic of Letters
+            Salon · Building the Republic of Science
           </p>
         </div>
       </footer>

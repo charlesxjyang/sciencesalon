@@ -36,9 +36,17 @@ export default async function FeedPage() {
     console.error("Error fetching posts:", error);
   }
 
+  // Fetch bot info for authors who are bots
+  const authorOrcids = [...new Set(rawPosts?.map((p) => p.author_orcid) || [])];
+  const { data: bots } = authorOrcids.length > 0
+    ? await supabase.from("bots").select("user_orcid").in("user_orcid", authorOrcids)
+    : { data: [] };
+  const botOrcids = new Set(bots?.map((b) => b.user_orcid) || []);
+
   // Add counts and user-specific data to each post
   const posts = rawPosts?.map((post) => ({
     ...post,
+    author: post.author ? { ...post.author, is_bot: botOrcids.has(post.author_orcid) } : null,
     comments_count: post.comments?.length || 0,
     likes_count: post.likes?.length || 0,
     user_liked: post.likes?.some((like: { user_orcid: string }) => like.user_orcid === user.orcid_id) || false,
@@ -54,6 +62,12 @@ export default async function FeedPage() {
             <span className="text-sage">◆</span> Salon
           </Link>
           <div className="flex items-center gap-4">
+            <Link
+              href="/bots"
+              className="text-sm text-ink/60 hover:text-ink transition-colors"
+            >
+              Bots
+            </Link>
             <Link
               href={`/user/${user.orcid_id}`}
               className="text-sm text-ink/60 hover:text-ink transition-colors"

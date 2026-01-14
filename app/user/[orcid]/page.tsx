@@ -26,6 +26,15 @@ export default async function UserPage({ params }: UserPageProps) {
     notFound();
   }
 
+  // Check if user is a bot
+  const { data: botData } = await supabase
+    .from("bots")
+    .select("*")
+    .eq("user_orcid", params.orcid)
+    .single();
+
+  const isBot = !!botData;
+
   // Get current user for header
   const cookieStore = cookies();
   const userCookie = cookieStore.get("salon_user");
@@ -72,6 +81,7 @@ export default async function UserPage({ params }: UserPageProps) {
   // Add counts and user-specific data to each post
   const posts = rawPosts?.map((post) => ({
     ...post,
+    author: post.author ? { ...post.author, is_bot: isBot } : null,
     comments_count: post.comments?.length || 0,
     likes_count: post.likes?.length || 0,
     user_liked: currentUser
@@ -119,8 +129,26 @@ export default async function UserPage({ params }: UserPageProps) {
             <div className="flex-1">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-serif mb-1">{user.name}</h1>
-                  {!user.orcid_id.startsWith("google_") ? (
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl font-serif">{user.name}</h1>
+                    {isBot && (
+                      <span className="px-2 py-0.5 text-xs bg-sage/10 text-sage rounded font-sans">
+                        Bot
+                      </span>
+                    )}
+                  </div>
+                  {isBot && botData ? (
+                    <div className="text-sm text-ink/60">
+                      <span className="font-mono bg-ink/5 px-1.5 py-0.5 rounded">
+                        {botData.category}
+                      </span>
+                      {botData.last_fetched_at && (
+                        <span className="ml-2">
+                          Last updated: {new Date(botData.last_fetched_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  ) : !user.orcid_id.startsWith("google_") ? (
                     <a
                       href={`https://orcid.org/${user.orcid_id}`}
                       target="_blank"

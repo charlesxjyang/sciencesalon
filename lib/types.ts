@@ -8,6 +8,17 @@ export interface User {
   followers_count?: number;
   following_count?: number;
   is_followed?: boolean;
+  is_bot?: boolean;
+  bot?: Bot;
+}
+
+export interface Bot {
+  id: string;
+  user_orcid: string;
+  category: string;
+  description: string | null;
+  last_fetched_at: string | null;
+  created_at: string;
 }
 
 export interface Follow {
