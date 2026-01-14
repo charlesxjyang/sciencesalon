@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(new URL("/feed", request.url));
     
     const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      httpOnly: false,
+      secure: true,
       sameSite: "lax" as const,
       maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",
