@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeCodeForToken, getOrcidProfile } from "@/lib/orcid";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -50,28 +49,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Set session cookie
-    const cookieStore = cookies();
-    cookieStore.set("salon_user", JSON.stringify({
+    // Create redirect response and set cookies on it
+    const response = NextResponse.redirect(new URL("/feed", request.url));
+    
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: "/",
+    };
+
+    response.cookies.set("salon_user", JSON.stringify({
       orcid_id: profile.orcidId,
       name: profile.name,
-    }), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/",
-    });
+    }), cookieOptions);
 
-    cookieStore.set("salon_token", access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: "/",
-    });
+    response.cookies.set("salon_token", access_token, cookieOptions);
 
-    return NextResponse.redirect(new URL("/feed", request.url));
+    return response;
   } catch (error) {
     console.error("Auth error:", error);
     return NextResponse.redirect(
