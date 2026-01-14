@@ -5,6 +5,16 @@ export interface User {
   created_at: string;
   auth_provider?: 'orcid' | 'google';
   email?: string;
+  followers_count?: number;
+  following_count?: number;
+  is_followed?: boolean;
+}
+
+export interface Follow {
+  id: string;
+  follower_id: string;
+  following_id: string;
+  created_at: string;
 }
 
 export interface Post {

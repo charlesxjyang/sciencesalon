@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PostCard } from "@/components/PostCard";
+import { FollowButton } from "@/components/FollowButton";
 import type { Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,30 @@ export default async function UserPage({ params }: UserPageProps) {
   const userCookie = cookieStore.get("salon_user");
   const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
 
+  // Fetch followers count
+  const { count: followersCount } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("following_id", params.orcid);
+
+  // Fetch following count
+  const { count: followingCount } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("follower_id", params.orcid);
+
+  // Check if current user follows this profile
+  let isFollowed = false;
+  if (currentUser && currentUser.orcid_id !== params.orcid) {
+    const { data: followData } = await supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", currentUser.orcid_id)
+      .eq("following_id", params.orcid)
+      .single();
+    isFollowed = !!followData;
+  }
+
   // Fetch user's posts with comments and likes
   const { data: rawPosts, error: postsError } = await supabase
     .from("posts")
@@ -55,13 +80,15 @@ export default async function UserPage({ params }: UserPageProps) {
     likes: undefined,
   }));
 
+  const isOwnProfile = currentUser?.orcid_id === params.orcid;
+
   return (
     <div className="min-h-screen">
       {/* Header */}
       <header className="border-b border-ink/10 sticky top-0 bg-cream/95 backdrop-blur-sm z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/feed" className="text-xl font-serif">
-            <span className="text-sage">◆</span> Salon
+            <span className="text-sage">&#9670;</span> Salon
           </Link>
           {currentUser && (
             <div className="flex items-center gap-4">
@@ -89,16 +116,50 @@ export default async function UserPage({ params }: UserPageProps) {
             <div className="w-16 h-16 rounded-full bg-sage/20 flex items-center justify-center text-sage font-sans text-xl">
               {user.name.charAt(0)}
             </div>
-            <div>
-              <h1 className="text-2xl font-serif mb-1">{user.name}</h1>
-              <a
-                href={`https://orcid.org/${user.orcid_id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-sage hover:text-sage/80 transition-colors"
-              >
-                ORCID: {user.orcid_id}
-              </a>
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-serif mb-1">{user.name}</h1>
+                  {!user.orcid_id.startsWith("google_") ? (
+                    <a
+                      href={`https://orcid.org/${user.orcid_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-sage hover:text-sage/80 transition-colors"
+                    >
+                      ORCID: {user.orcid_id}
+                    </a>
+                  ) : (
+                    <span className="text-sm text-ink/40">Google user</span>
+                  )}
+                </div>
+                {currentUser && !isOwnProfile && (
+                  <FollowButton
+                    userId={params.orcid}
+                    initialIsFollowing={isFollowed}
+                    initialFollowersCount={followersCount || 0}
+                  />
+                )}
+              </div>
+
+              {/* Follower/Following counts */}
+              <div className="flex gap-4 mt-3 text-sm">
+                <Link
+                  href={`/user/${params.orcid}/followers`}
+                  className="hover:text-sage transition-colors"
+                >
+                  <span className="font-medium">{followersCount || 0}</span>{" "}
+                  <span className="text-ink/60">followers</span>
+                </Link>
+                <Link
+                  href={`/user/${params.orcid}/following`}
+                  className="hover:text-sage transition-colors"
+                >
+                  <span className="font-medium">{followingCount || 0}</span>{" "}
+                  <span className="text-ink/60">following</span>
+                </Link>
+              </div>
+
               {user.bio && (
                 <p className="mt-3 text-ink/70">{user.bio}</p>
               )}
