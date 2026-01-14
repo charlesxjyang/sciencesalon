@@ -3,6 +3,8 @@ export interface User {
   name: string;
   bio: string | null;
   created_at: string;
+  auth_provider?: 'orcid' | 'google';
+  email?: string;
 }
 
 export interface Post {
