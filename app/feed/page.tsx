@@ -63,6 +63,25 @@ export default async function FeedPage() {
           </Link>
           <div className="flex items-center gap-4">
             <Link
+              href="/search"
+              className="text-ink/60 hover:text-ink transition-colors"
+              aria-label="Search"
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </Link>
+            <Link
               href="/bots"
               className="text-sm text-ink/60 hover:text-ink transition-colors"
             >
