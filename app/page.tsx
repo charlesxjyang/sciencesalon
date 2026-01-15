@@ -35,11 +35,11 @@ export default async function Home() {
       <section className="max-w-4xl mx-auto px-6 py-24">
         <div className="max-w-2xl">
           <h2 className="text-5xl font-serif leading-tight mb-6">
-            Where scientists discuss ideas before they become papers
+            A social media platform for scientists
           </h2>
           <p className="text-xl text-ink/70 leading-relaxed mb-8">
-            Salon is a place for open, casual conversation about science. 
-            Share thoughts, discuss papers, explore half-formed ideas with peers. 
+            Salon is a place for open discussions about scientific research.
+            Share thoughts, discuss papers, and explore half-formed ideas with peers. 
             Like the coffeehouses and salons where modern science was born.
           </p>
           {!user && (
@@ -56,26 +56,26 @@ export default async function Home() {
           <div className="grid md:grid-cols-3 gap-12">
             <div>
               <h3 className="font-sans text-sm uppercase tracking-wide text-sage mb-3">
-                For Scientists & Researchers
+                For Scientists & Tinkerers
               </h3>
               <p className="text-ink/70">
-                Sign in with your ORCID. Everyone here is a working scientist.
+                A social graph built for researchers
               </p>
             </div>
             <div>
               <h3 className="font-sans text-sm uppercase tracking-wide text-sage mb-3">
-                Paper-native
+                Built for sharing papers
               </h3>
               <p className="text-ink/70">
-                Share arXiv and DOI links. They automatically expand with titles, authors, abstracts.
+                Arxiv and DOI links automatically expand with titles, authors, abstracts. Easily search for posts that mention a paper to catch the latest discussions.
               </p>
             </div>
             <div>
               <h3 className="font-sans text-sm uppercase tracking-wide text-sage mb-3">
-                Pre-rigorous
+                Peer review at the speed of posting
               </h3>
               <p className="text-ink/70">
-                The place for night science—ideas that aren't ready for papers yet.
+                Open, scientific discussion
               </p>
             </div>
           </div>
