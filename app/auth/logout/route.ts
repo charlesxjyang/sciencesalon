@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
-  const cookieStore = cookies();
+export async function GET(request: NextRequest) {
+  // Create redirect response
+  const response = NextResponse.redirect(new URL("/", request.url));
   
-  cookieStore.delete("salon_user");
-  cookieStore.delete("salon_token");
+  // Delete cookies on the response
+  response.cookies.delete("salon_user");
+  response.cookies.delete("salon_token");
 
-  return NextResponse.redirect(new URL("/", process.env.NEXT_PUBLIC_APP_URL));
+  return response;
 }
