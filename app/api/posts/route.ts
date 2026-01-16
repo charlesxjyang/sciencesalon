@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
           abstract: paper.abstract,
           published_date: paper.publishedDate,
           url: paper.url,
+          source_url: paper.sourceUrl,
         }))
       );
 

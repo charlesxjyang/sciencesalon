@@ -162,6 +162,7 @@ export interface PaperMetadata {
   abstract: string | null;
   publishedDate: string | null;
   url: string;
+  sourceUrl?: string;
 }
 
 export interface LinkPreview {
@@ -470,7 +471,12 @@ export async function resolveUrlToPaper(url: string): Promise<PaperMetadata | nu
   if (doi) {
     const crossrefMetadata = await fetchDoiMetadata(doi);
     if (crossrefMetadata) {
-      return crossrefMetadata;
+      // Add source URL if different from canonical
+      const canonicalUrl = `https://doi.org/${doi}`;
+      return {
+        ...crossrefMetadata,
+        sourceUrl: url !== canonicalUrl ? url : undefined,
+      };
     }
 
     // Crossref failed (paper too new), use scraped data as fallback
@@ -487,6 +493,7 @@ export async function resolveUrlToPaper(url: string): Promise<PaperMetadata | nu
         abstract: scrapedData.abstract || null,
         publishedDate: scrapedData.publishedDate || null,
         url: `https://doi.org/${doi}`,
+        sourceUrl: url,
       };
     }
   }

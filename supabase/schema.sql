@@ -29,6 +29,7 @@ create table if not exists paper_mentions (
   abstract text,
   published_date text,
   url text not null,
+  source_url text,
   fetched_at timestamp with time zone default now()
 );
 
