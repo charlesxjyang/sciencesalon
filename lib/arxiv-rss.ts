@@ -68,6 +68,10 @@ export async function fetchArxivRSS(category: string): Promise<ArxivPaper[]> {
       .replace(/&#39;/g, "'")
       .replace(/\s+/g, ' ')
       .trim();
+    // Remove arXiv metadata prefix (e.g., "arXiv:2510.21536v3 Announce Type: replace Abstract: ")
+    abstract = abstract
+      .replace(/^arXiv:\S+\s+Announce Type:\s+\w+\s+Abstract:\s*/i, '')
+      .trim();
 
     // Extract published date
     const pubDateMatch = itemContent.match(/<pubDate>(.*?)<\/pubDate>/);
