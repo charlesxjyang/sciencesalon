@@ -239,11 +239,11 @@ function SearchContent() {
                               </span>
                             )}
                           </div>
-                          {user.is_bot && user.bot ? (
+                          {user.is_bot && user.bot_category ? (
                             <p className="text-sm text-ink/60">
                               arXiv{" "}
                               <span className="font-mono bg-ink/5 px-1 rounded">
-                                {user.bot.category}
+                                {user.bot_category}
                               </span>
                             </p>
                           ) : user.bio ? (

@@ -41,14 +41,7 @@ export async function GET(req: NextRequest) {
       .limit(20);
 
     if (users && users.length > 0) {
-      // Get bot info for matching users
       const userOrcids = users.map((u) => u.orcid_id);
-      const { data: bots } = await supabase
-        .from("bots")
-        .select("user_orcid, category")
-        .in("user_orcid", userOrcids);
-
-      const botMap = new Map(bots?.map((b) => [b.user_orcid, b]) || []);
 
       // Get follower counts
       const { data: followerCounts } = await supabase
@@ -79,8 +72,6 @@ export async function GET(req: NextRequest) {
 
       results.users = users.map((user) => ({
         ...user,
-        is_bot: botMap.has(user.orcid_id),
-        bot: botMap.get(user.orcid_id) || null,
         followers_count: followersCountMap.get(user.orcid_id) || 0,
         is_followed: currentUserFollowing.has(user.orcid_id),
       }));

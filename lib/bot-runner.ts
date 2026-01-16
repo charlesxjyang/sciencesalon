@@ -87,9 +87,9 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
 
     // Update bot's last_fetched_at
     await supabase
-      .from("bots")
-      .update({ last_fetched_at: new Date().toISOString() })
-      .eq("user_orcid", botOrcid);
+      .from("users")
+      .update({ bot_last_fetched_at: new Date().toISOString() })
+      .eq("orcid_id", botOrcid);
 
   } catch (error) {
     result.errors.push(`Failed to fetch RSS for ${category}: ${error}`);
@@ -108,11 +108,12 @@ export async function runAllBots(): Promise<BotRunResult[]> {
   const supabase = createServiceRoleClient();
   const results: BotRunResult[] = [];
 
-  // Fetch only bots with allowed categories
+  // Fetch bot users with allowed categories
   const { data: bots, error } = await supabase
-    .from("bots")
-    .select("*")
-    .in("category", ALLOWED_CATEGORIES);
+    .from("users")
+    .select("orcid_id, bot_category")
+    .eq("is_bot", true)
+    .in("bot_category", ALLOWED_CATEGORIES);
 
   if (error) {
     throw new Error(`Failed to fetch bots: ${error.message}`);
@@ -124,7 +125,7 @@ export async function runAllBots(): Promise<BotRunResult[]> {
 
   // Run each bot
   for (const bot of bots) {
-    const result = await runBot(bot.user_orcid, bot.category);
+    const result = await runBot(bot.orcid_id, bot.bot_category!);
     results.push(result);
   }
 

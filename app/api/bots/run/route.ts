@@ -58,20 +58,21 @@ export async function POST(req: NextRequest) {
       // Run specific bot by orcid, fetch category from database
       const supabase = createServiceRoleClient();
       const { data: bot } = await supabase
-        .from("bots")
-        .select("category")
-        .eq("user_orcid", botOrcid)
+        .from("users")
+        .select("bot_category")
+        .eq("orcid_id", botOrcid)
+        .eq("is_bot", true)
         .single();
 
-      if (!bot) {
+      if (!bot || !bot.bot_category) {
         return NextResponse.json(
           { error: "Bot not found" },
           { status: 404 }
         );
       }
 
-      console.log(`Running bot ${botOrcid} for category ${bot.category}`);
-      const result = await runBot(botOrcid, bot.category);
+      console.log(`Running bot ${botOrcid} for category ${bot.bot_category}`);
+      const result = await runBot(botOrcid, bot.bot_category);
       results = [result];
     } else {
       // Run all bots

@@ -32,17 +32,15 @@ export default async function BotsPage() {
   const userCookie = cookieStore.get("salon_user");
   const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
 
-  // Fetch all bots with their user profiles
+  // Fetch all bot users
   const { data: bots } = await supabase
-    .from("bots")
-    .select(`
-      *,
-      user:users!bots_user_orcid_fkey(*)
-    `)
+    .from("users")
+    .select("*")
+    .eq("is_bot", true)
     .order("created_at", { ascending: false });
 
   // Get follower counts for each bot
-  const botOrcids = bots?.map((b) => b.user_orcid) || [];
+  const botOrcids = bots?.map((b) => b.orcid_id) || [];
 
   const { data: followerCounts } = botOrcids.length > 0
     ? await supabase
@@ -138,23 +136,16 @@ export default async function BotsPage() {
         <div className="space-y-4">
           {bots && bots.length > 0 ? (
             bots.map((bot) => {
-              const botUser = bot.user as unknown as {
-                orcid_id: string;
-                name: string;
-                bio: string | null;
-              } | null;
-              if (!botUser) return null;
-
-              const isFollowed = currentUserFollowing.has(botUser.orcid_id);
-              const followerCount = followersCountMap.get(botUser.orcid_id) || 0;
-              const postCount = postCountMap.get(botUser.orcid_id) || 0;
-              const categoryDescription = CATEGORY_DESCRIPTIONS[bot.category] || bot.category;
+              const isFollowed = currentUserFollowing.has(bot.orcid_id);
+              const followerCount = followersCountMap.get(bot.orcid_id) || 0;
+              const postCount = postCountMap.get(bot.orcid_id) || 0;
+              const categoryDescription = bot.bot_category ? (CATEGORY_DESCRIPTIONS[bot.bot_category] || bot.bot_category) : "";
 
               return (
-                <div key={bot.id} className="paper-card">
+                <div key={bot.orcid_id} className="paper-card">
                   <div className="flex items-start gap-3">
                     <Link
-                      href={`/user/${botUser.orcid_id}`}
+                      href={`/user/${bot.orcid_id}`}
                       className="w-12 h-12 rounded-full bg-sage/20 flex items-center justify-center text-sage flex-shrink-0"
                     >
                       <svg
@@ -174,34 +165,36 @@ export default async function BotsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <Link
-                          href={`/user/${botUser.orcid_id}`}
+                          href={`/user/${bot.orcid_id}`}
                           className="font-medium hover:text-sage transition-colors"
                         >
-                          {botUser.name}
+                          {bot.name}
                         </Link>
                         <span className="px-1.5 py-0.5 text-xs bg-sage/10 text-sage rounded">
                           Bot
                         </span>
                       </div>
                       <p className="text-sm text-ink/60 mb-2">
-                        {bot.description || `Posts new papers from arXiv ${categoryDescription}`}
+                        {bot.bio || `Posts new papers from arXiv ${categoryDescription}`}
                       </p>
                       <div className="flex items-center gap-4 text-xs text-ink/40">
-                        <span className="font-mono bg-ink/5 px-1.5 py-0.5 rounded">
-                          {bot.category}
-                        </span>
+                        {bot.bot_category && (
+                          <span className="font-mono bg-ink/5 px-1.5 py-0.5 rounded">
+                            {bot.bot_category}
+                          </span>
+                        )}
                         <span>{postCount} posts</span>
                         <span>{followerCount} followers</span>
-                        {bot.last_fetched_at && (
+                        {bot.bot_last_fetched_at && (
                           <span>
-                            Last updated: {new Date(bot.last_fetched_at).toLocaleDateString()}
+                            Last updated: {new Date(bot.bot_last_fetched_at).toLocaleDateString()}
                           </span>
                         )}
                       </div>
                     </div>
                     {currentUser && (
                       <FollowButton
-                        userId={botUser.orcid_id}
+                        userId={bot.orcid_id}
                         initialIsFollowing={isFollowed}
                         initialFollowersCount={followerCount}
                       />
