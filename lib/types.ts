@@ -36,6 +36,7 @@ export interface Post {
   updated_at: string;
   author?: User;
   paper_mentions?: PaperMention[];
+  link_previews?: LinkPreview[];
   comments?: Comment[];
   comments_count?: number;
   likes_count?: number;
@@ -69,6 +70,14 @@ export interface PaperMention {
   published_date: string | null;
   url: string;
   fetched_at: string;
+}
+
+export interface LinkPreview {
+  url: string;
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  site_name: string | null;
 }
 
 export interface Session {

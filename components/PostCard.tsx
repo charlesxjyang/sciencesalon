@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Post, User } from "@/lib/types";
 import { PaperCard } from "./PaperCard";
+import { LinkPreviewCard } from "./LinkPreviewCard";
 import { CommentSection } from "./CommentSection";
 
 interface PostCardProps {
@@ -83,6 +84,15 @@ export function PostCard({ post, currentUser }: PostCardProps) {
             <div className="mt-4 space-y-3">
               {post.paper_mentions.map((paper) => (
                 <PaperCard key={paper.id} paper={paper} />
+              ))}
+            </div>
+          )}
+
+          {/* Link previews */}
+          {post.link_previews && post.link_previews.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {post.link_previews.map((preview) => (
+                <LinkPreviewCard key={preview.url} preview={preview} />
               ))}
             </div>
           )}

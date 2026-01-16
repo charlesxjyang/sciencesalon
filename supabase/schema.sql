@@ -13,6 +13,7 @@ create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
   author_orcid text not null references users(orcid_id) on delete cascade,
   content text not null,
+  link_previews jsonb default '[]',
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );

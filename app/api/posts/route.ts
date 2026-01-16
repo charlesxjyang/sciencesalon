@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { extractPaperLinks, fetchPaperMetadata, resolveUrlToPaper } from "@/lib/papers";
+import { extractPaperLinks, fetchPaperMetadata, resolveUrlToPaper, fetchLinkPreview } from "@/lib/papers";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
@@ -63,13 +63,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Process generic URLs (with timeout protection)
+    // Process generic URLs - try as papers first, then as link previews
+    const urlResults: { url: string; paper: any | null }[] = [];
+
     for (const url of urls) {
       paperPromises.push(
         resolveUrlToPaper(url)
-          .then((metadata) => (metadata ? { ...metadata, postId: post.id } : null))
+          .then((metadata) => {
+            urlResults.push({ url, paper: metadata ? { ...metadata, postId: post.id } : null });
+            return metadata ? { ...metadata, postId: post.id } : null;
+          })
           .catch((error) => {
             console.error(`Error resolving URL ${url}:`, error);
+            urlResults.push({ url, paper: null });
             return null;
           })
       );
@@ -110,6 +116,41 @@ export async function POST(request: NextRequest) {
       if (papersError) {
         console.error("Error inserting paper mentions:", papersError);
         // Don't fail the whole request, just log it
+      }
+    }
+
+    // Get URLs that didn't resolve to papers and fetch link previews
+    const nonPaperUrls = urlResults
+      .filter((r) => r.paper === null)
+      .map((r) => r.url);
+
+    if (nonPaperUrls.length > 0) {
+      const linkPreviewPromises = nonPaperUrls.map((url) =>
+        fetchLinkPreview(url).catch(() => null)
+      );
+
+      const linkPreviewResults = await Promise.allSettled(linkPreviewPromises);
+      const linkPreviews = linkPreviewResults
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+        .map((r) => r.value)
+        .filter(Boolean)
+        .map((preview) => ({
+          url: preview.url,
+          title: preview.title,
+          description: preview.description,
+          image_url: preview.imageUrl,
+          site_name: preview.siteName,
+        }));
+
+      if (linkPreviews.length > 0) {
+        const { error: updateError } = await supabase
+          .from("posts")
+          .update({ link_previews: linkPreviews })
+          .eq("id", post.id);
+
+        if (updateError) {
+          console.error("Error updating link previews:", updateError);
+        }
       }
     }
 

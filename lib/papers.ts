@@ -164,6 +164,14 @@ export interface PaperMetadata {
   url: string;
 }
 
+export interface LinkPreview {
+  url: string;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  siteName: string | null;
+}
+
 export function extractPaperLinks(content: string): {
   arxivIds: string[];
   dois: string[];
@@ -589,5 +597,95 @@ export async function fetchPaperMetadata(
     return fetchArxivMetadata(identifier);
   } else {
     return fetchDoiMetadata(identifier);
+  }
+}
+
+/**
+ * Fetch Open Graph metadata for a generic URL
+ */
+export async function fetchLinkPreview(url: string): Promise<LinkPreview | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; Salon.Science/1.0; +https://salon.science)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      signal: controller.signal,
+      redirect: 'follow',
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+
+    // Extract Open Graph and meta tags
+    const getMetaContent = (patterns: RegExp[]): string | null => {
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match && match[1]) {
+          return decodeHtmlEntities(match[1].trim());
+        }
+      }
+      return null;
+    };
+
+    const title = getMetaContent([
+      /<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i,
+      /<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i,
+      /<title>([^<]+)<\/title>/i,
+    ]);
+
+    const description = getMetaContent([
+      /<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i,
+      /<meta[^>]*name=["']twitter:description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i,
+    ]);
+
+    let imageUrl = getMetaContent([
+      /<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i,
+      /<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i,
+    ]);
+
+    // Make image URL absolute if relative
+    if (imageUrl && !imageUrl.startsWith('http')) {
+      try {
+        const baseUrl = new URL(url);
+        imageUrl = new URL(imageUrl, baseUrl.origin).href;
+      } catch {
+        imageUrl = null;
+      }
+    }
+
+    const siteName = getMetaContent([
+      /<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i,
+      /<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:site_name["']/i,
+    ]) || new URL(url).hostname.replace(/^www\./, '');
+
+    // Only return if we have at least a title
+    if (!title) {
+      return null;
+    }
+
+    return {
+      url,
+      title,
+      description,
+      imageUrl,
+      siteName,
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    return null;
   }
 }
