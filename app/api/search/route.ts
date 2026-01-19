@@ -62,10 +62,11 @@ function parsePaperQuery(query: string): {
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const query = searchParams.get("q")?.trim();
-  const type = searchParams.get("type") || "all"; // all, users, papers
+  const type = searchParams.get("type") || "posts"; // posts, users, papers
 
   if (!query || query.length < 2) {
     return NextResponse.json({
+      posts: [],
       users: [],
       papers: [],
       error: "Query must be at least 2 characters",
@@ -74,22 +75,71 @@ export async function GET(req: NextRequest) {
 
   const supabase = createServiceRoleClient();
 
-  // Get current user for follow status
+  // Get current user for follow status and likes
   const cookieStore = cookies();
   const userCookie = cookieStore.get("salon_user");
   const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
 
   const results: {
+    posts: unknown[];
     users: unknown[];
     papers: unknown[];
   } = {
+    posts: [],
     users: [],
     papers: [],
   };
 
   try {
+    // Helper to enrich posts with likes data
+    async function enrichPostsWithLikes(posts: any[]) {
+      if (!posts.length) return posts;
+
+      const postIds = posts.map((p) => p.id);
+
+      // Get likes counts
+      const { data: likesData } = await supabase
+        .from("likes")
+        .select("post_id")
+        .in("post_id", postIds);
+
+      const likesCountMap = new Map<string, number>();
+      likesData?.forEach((l) => {
+        likesCountMap.set(l.post_id, (likesCountMap.get(l.post_id) || 0) + 1);
+      });
+
+      // Get comments counts
+      const { data: commentsData } = await supabase
+        .from("comments")
+        .select("post_id")
+        .in("post_id", postIds);
+
+      const commentsCountMap = new Map<string, number>();
+      commentsData?.forEach((c) => {
+        commentsCountMap.set(c.post_id, (commentsCountMap.get(c.post_id) || 0) + 1);
+      });
+
+      // Check which posts the current user liked
+      let userLikedPosts = new Set<string>();
+      if (currentUser) {
+        const { data: userLikes } = await supabase
+          .from("likes")
+          .select("post_id")
+          .eq("user_orcid", currentUser.orcid_id)
+          .in("post_id", postIds);
+        userLikedPosts = new Set(userLikes?.map((l) => l.post_id) || []);
+      }
+
+      return posts.map((post) => ({
+        ...post,
+        likes_count: likesCountMap.get(post.id) || 0,
+        comments_count: commentsCountMap.get(post.id) || 0,
+        user_liked: userLikedPosts.has(post.id),
+      }));
+    }
+
     // Search users
-    if (type === "all" || type === "users") {
+    if (type === "users") {
       const { data: users, error: usersError } = await supabase
         .from("users")
         .select("*")
@@ -146,119 +196,125 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Search papers
-    if (type === "all" || type === "papers") {
-      const parsed = parsePaperQuery(query);
-      const paperMap = new Map<string, unknown>();
-
-      const paperSelect = `
+    // Search posts (by content text)
+    if (type === "posts") {
+      const postSelect = `
         *,
-        post:posts!paper_mentions_post_id_fkey(
-          id,
-          author_orcid,
-          created_at,
-          author:users!posts_author_orcid_fkey(name, orcid_id)
-        )
+        author:users!posts_author_orcid_fkey(*),
+        paper_mentions(*),
+        link_previews
       `;
 
-      if (parsed.type === "doi") {
-        // Search by DOI - check doi column, identifier, or url
-        const { data: papersByDoi, error: doiError } = await supabase
-          .from("paper_mentions")
-          .select(paperSelect)
-          .or(`doi.eq.${parsed.value},identifier.eq.${parsed.value},url.eq.https://doi.org/${parsed.value}`)
-          .order("fetched_at", { ascending: false })
-          .limit(30);
+      const { data: posts, error: postsError } = await supabase
+        .from("posts")
+        .select(postSelect)
+        .ilike("content", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .limit(30);
 
-        if (doiError) {
-          console.error("Error searching papers by DOI:", doiError);
-        }
-        papersByDoi?.forEach((p) => paperMap.set(p.id, p));
-
-        // Also search by source_url if we have the original URL
-        if (parsed.normalizedUrl) {
-          const { data: papersBySourceUrl } = await supabase
-            .from("paper_mentions")
-            .select(paperSelect)
-            .or(`url.eq.${parsed.normalizedUrl},source_url.eq.${parsed.normalizedUrl}`)
-            .limit(30);
-          papersBySourceUrl?.forEach((p) => paperMap.set(p.id, p));
-        }
-      } else if (parsed.type === "arxiv") {
-        // Search by arXiv ID - check arxiv_id column, identifier, or url
-        const { data: papersByArxiv, error: arxivError } = await supabase
-          .from("paper_mentions")
-          .select(paperSelect)
-          .or(`arxiv_id.eq.${parsed.value},identifier.eq.${parsed.value},url.eq.https://arxiv.org/abs/${parsed.value}`)
-          .order("fetched_at", { ascending: false })
-          .limit(30);
-
-        if (arxivError) {
-          console.error("Error searching papers by arXiv:", arxivError);
-        }
-        papersByArxiv?.forEach((p) => paperMap.set(p.id, p));
-
-        // Also search by source_url if we have the original URL
-        if (parsed.normalizedUrl) {
-          const { data: papersBySourceUrl } = await supabase
-            .from("paper_mentions")
-            .select(paperSelect)
-            .or(`url.eq.${parsed.normalizedUrl},source_url.eq.${parsed.normalizedUrl}`)
-            .limit(30);
-          papersBySourceUrl?.forEach((p) => paperMap.set(p.id, p));
-        }
-      } else if (parsed.type === "url") {
-        // Search by URL directly (journal links, etc.)
-        // Normalize URL by removing trailing slashes and query params for matching
-        const normalizedUrl = parsed.value.split("?")[0].replace(/\/+$/, "");
-
-        const { data: papersByUrl, error: urlError } = await supabase
-          .from("paper_mentions")
-          .select(paperSelect)
-          .or(`url.eq.${parsed.value},source_url.eq.${parsed.value},url.eq.${normalizedUrl},source_url.eq.${normalizedUrl}`)
-          .order("fetched_at", { ascending: false })
-          .limit(30);
-
-        if (urlError) {
-          console.error("Error searching papers by URL:", urlError);
-        }
-        papersByUrl?.forEach((p) => paperMap.set(p.id, p));
-      } else {
-        // Regular text search by title, authors, or abstract
-        const { data: papers, error: papersError } = await supabase
-          .from("paper_mentions")
-          .select(paperSelect)
-          .or(`title.ilike.%${query}%,abstract.ilike.%${query}%`)
-          .order("fetched_at", { ascending: false })
-          .limit(30);
-
-        if (papersError) {
-          console.error("Error searching papers:", papersError);
-        }
-        papers?.forEach((p) => paperMap.set(p.id, p));
-
-        // Also search by author name in the authors array
-        const { data: papersByAuthor, error: authorError } = await supabase
-          .from("paper_mentions")
-          .select(paperSelect)
-          .contains("authors", [query])
-          .order("fetched_at", { ascending: false })
-          .limit(20);
-
-        if (authorError) {
-          console.error("Error searching papers by author:", authorError);
-        }
-        papersByAuthor?.forEach((p) => paperMap.set(p.id, p));
+      if (postsError) {
+        console.error("Error searching posts:", postsError);
       }
 
-      results.papers = Array.from(paperMap.values()).slice(0, 30);
+      if (posts && posts.length > 0) {
+        results.posts = await enrichPostsWithLikes(posts);
+      }
+    }
+
+    // Search papers (returns full posts that contain matching papers)
+    if (type === "papers") {
+      const parsed = parsePaperQuery(query);
+      const postIdsSet = new Set<string>();
+
+      // First, find matching paper mentions and collect their post IDs
+      if (parsed.type === "doi") {
+        const { data: papersByDoi } = await supabase
+          .from("paper_mentions")
+          .select("post_id")
+          .or(`doi.eq.${parsed.value},identifier.eq.${parsed.value},url.eq.https://doi.org/${parsed.value}`)
+          .limit(50);
+        papersByDoi?.forEach((p) => postIdsSet.add(p.post_id));
+
+        if (parsed.normalizedUrl) {
+          const { data: papersBySourceUrl } = await supabase
+            .from("paper_mentions")
+            .select("post_id")
+            .or(`url.eq.${parsed.normalizedUrl},source_url.eq.${parsed.normalizedUrl}`)
+            .limit(50);
+          papersBySourceUrl?.forEach((p) => postIdsSet.add(p.post_id));
+        }
+      } else if (parsed.type === "arxiv") {
+        const { data: papersByArxiv } = await supabase
+          .from("paper_mentions")
+          .select("post_id")
+          .or(`arxiv_id.eq.${parsed.value},identifier.eq.${parsed.value},url.eq.https://arxiv.org/abs/${parsed.value}`)
+          .limit(50);
+        papersByArxiv?.forEach((p) => postIdsSet.add(p.post_id));
+
+        if (parsed.normalizedUrl) {
+          const { data: papersBySourceUrl } = await supabase
+            .from("paper_mentions")
+            .select("post_id")
+            .or(`url.eq.${parsed.normalizedUrl},source_url.eq.${parsed.normalizedUrl}`)
+            .limit(50);
+          papersBySourceUrl?.forEach((p) => postIdsSet.add(p.post_id));
+        }
+      } else if (parsed.type === "url") {
+        const normalizedUrl = parsed.value.split("?")[0].replace(/\/+$/, "");
+        const { data: papersByUrl } = await supabase
+          .from("paper_mentions")
+          .select("post_id")
+          .or(`url.eq.${parsed.value},source_url.eq.${parsed.value},url.eq.${normalizedUrl},source_url.eq.${normalizedUrl}`)
+          .limit(50);
+        papersByUrl?.forEach((p) => postIdsSet.add(p.post_id));
+      } else {
+        // Text search by title, authors, or abstract
+        const { data: papers } = await supabase
+          .from("paper_mentions")
+          .select("post_id")
+          .or(`title.ilike.%${query}%,abstract.ilike.%${query}%`)
+          .limit(50);
+        papers?.forEach((p) => postIdsSet.add(p.post_id));
+
+        const { data: papersByAuthor } = await supabase
+          .from("paper_mentions")
+          .select("post_id")
+          .contains("authors", [query])
+          .limit(30);
+        papersByAuthor?.forEach((p) => postIdsSet.add(p.post_id));
+      }
+
+      // Now fetch full posts for the matching post IDs
+      const postIds = Array.from(postIdsSet).slice(0, 30);
+      if (postIds.length > 0) {
+        const postSelect = `
+          *,
+          author:users!posts_author_orcid_fkey(*),
+          paper_mentions(*),
+          link_previews
+        `;
+
+        const { data: posts, error: postsError } = await supabase
+          .from("posts")
+          .select(postSelect)
+          .in("id", postIds)
+          .order("created_at", { ascending: false });
+
+        if (postsError) {
+          console.error("Error fetching posts for papers:", postsError);
+        }
+
+        if (posts && posts.length > 0) {
+          results.papers = await enrichPostsWithLikes(posts);
+        }
+      }
     }
 
     return NextResponse.json(results);
   } catch (error) {
     console.error("Search error:", error);
     return NextResponse.json(
-      { users: [], papers: [], error: "Search failed" },
+      { posts: [], users: [], papers: [], error: "Search failed" },
       { status: 500 }
     );
   }

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FollowButton } from "@/components/FollowButton";
-import { PaperCard } from "@/components/PaperCard";
-import type { User, PaperMention } from "@/lib/types";
+import { PostCard } from "@/components/PostCard";
+import type { User, Post } from "@/lib/types";
 
 interface SearchUser extends User {
   is_bot?: boolean;
@@ -13,27 +13,19 @@ interface SearchUser extends User {
   is_followed?: boolean;
 }
 
-interface SearchPaper extends PaperMention {
-  post?: {
-    id: string;
-    author_orcid: string;
-    created_at: string;
-    author?: { name: string; orcid_id: string };
-  };
-}
-
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialQuery = searchParams.get("q") || "";
-  const initialTab = searchParams.get("tab") || "all";
+  const initialTab = searchParams.get("tab") || "posts";
 
   const [query, setQuery] = useState(initialQuery);
-  const [activeTab, setActiveTab] = useState<"all" | "users" | "papers">(
-    initialTab as "all" | "users" | "papers"
+  const [activeTab, setActiveTab] = useState<"posts" | "users" | "papers">(
+    initialTab as "posts" | "users" | "papers"
   );
+  const [posts, setPosts] = useState<Post[]>([]);
   const [users, setUsers] = useState<SearchUser[]>([]);
-  const [papers, setPapers] = useState<SearchPaper[]>([]);
+  const [papers, setPapers] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
@@ -53,6 +45,7 @@ function SearchContent() {
 
   const performSearch = useCallback(async (searchQuery: string, type: string) => {
     if (searchQuery.length < 2) {
+      setPosts([]);
       setUsers([]);
       setPapers([]);
       return;
@@ -64,6 +57,7 @@ function SearchContent() {
         `/api/search?q=${encodeURIComponent(searchQuery)}&type=${type}`
       );
       const data = await response.json();
+      setPosts(data.posts || []);
       setUsers(data.users || []);
       setPapers(data.papers || []);
     } catch (error) {
@@ -81,7 +75,7 @@ function SearchContent() {
         // Update URL
         const params = new URLSearchParams();
         params.set("q", query);
-        if (activeTab !== "all") params.set("tab", activeTab);
+        if (activeTab !== "posts") params.set("tab", activeTab);
         router.replace(`/search?${params.toString()}`, { scroll: false });
       }
     }, 300);
@@ -96,7 +90,7 @@ function SearchContent() {
     }
   }, [initialQuery, initialTab, performSearch]);
 
-  const handleTabChange = (tab: "all" | "users" | "papers") => {
+  const handleTabChange = (tab: "posts" | "users" | "papers") => {
     setActiveTab(tab);
   };
 
@@ -163,7 +157,7 @@ function SearchContent() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 border-b border-ink/10">
-          {(["all", "users", "papers"] as const).map((tab) => (
+          {(["posts", "users", "papers"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => handleTabChange(tab)}
@@ -191,14 +185,20 @@ function SearchContent() {
         {/* Results */}
         {!isLoading && query.length >= 2 && (
           <div className="space-y-8">
-            {/* Users section */}
-            {(activeTab === "all" || activeTab === "users") && users.length > 0 && (
+            {/* Posts section */}
+            {activeTab === "posts" && posts.length > 0 && (
               <section>
-                {activeTab === "all" && (
-                  <h2 className="font-sans text-sm uppercase tracking-wide text-ink/40 mb-4">
-                    Users ({users.length})
-                  </h2>
-                )}
+                <div className="space-y-4">
+                  {posts.map((post) => (
+                    <PostCard key={post.id} post={post} currentUser={currentUser} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Users section */}
+            {activeTab === "users" && users.length > 0 && (
+              <section>
                 <div className="space-y-3">
                   {users.map((user) => (
                     <div key={user.orcid_id} className="paper-card">
@@ -266,37 +266,21 @@ function SearchContent() {
               </section>
             )}
 
-            {/* Papers section */}
-            {(activeTab === "all" || activeTab === "papers") && papers.length > 0 && (
+            {/* Papers section (shows posts that contain matching papers) */}
+            {activeTab === "papers" && papers.length > 0 && (
               <section>
-                {activeTab === "all" && (
-                  <h2 className="font-sans text-sm uppercase tracking-wide text-ink/40 mb-4">
-                    Papers ({papers.length})
-                  </h2>
-                )}
                 <div className="space-y-4">
-                  {papers.map((paper) => (
-                    <div key={paper.id} className="paper-card">
-                      <PaperCard paper={paper} />
-                      {paper.post?.author && (
-                        <div className="mt-3 pt-3 border-t border-ink/10 text-sm text-ink/60">
-                          Posted by{" "}
-                          <Link
-                            href={`/user/${paper.post.author.orcid_id}`}
-                            className="hover:text-sage transition-colors"
-                          >
-                            {paper.post.author.name}
-                          </Link>
-                        </div>
-                      )}
-                    </div>
+                  {papers.map((post) => (
+                    <PostCard key={post.id} post={post} currentUser={currentUser} />
                   ))}
                 </div>
               </section>
             )}
 
             {/* No results */}
-            {users.length === 0 && papers.length === 0 && (
+            {((activeTab === "posts" && posts.length === 0) ||
+              (activeTab === "users" && users.length === 0) ||
+              (activeTab === "papers" && papers.length === 0)) && (
               <div className="text-center py-12 text-ink/40">
                 <p>No results found for &ldquo;{query}&rdquo;</p>
                 <p className="text-sm mt-2">Try a different search term</p>
