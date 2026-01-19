@@ -56,11 +56,14 @@ export interface PaperMention {
   post_id: string;
   identifier: string;
   identifier_type: 'arxiv' | 'doi';
+  doi: string | null;  // DOI if available (stored for all papers)
+  arxiv_id: string | null;  // arXiv ID if available
   title: string;
   authors: string[];
   abstract: string | null;
   published_date: string | null;
   url: string;
+  source_url: string | null;  // Original URL if different from canonical
   fetched_at: string;
 }
 

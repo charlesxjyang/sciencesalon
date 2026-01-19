@@ -67,6 +67,8 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
             post_id: post.id,
             identifier: paper.arxivId,
             identifier_type: "arxiv",
+            arxiv_id: paper.arxivId,
+            doi: null,  // arXiv papers from RSS don't have DOI yet
             title: paper.title,
             authors: paper.authors,
             abstract: paper.abstract,

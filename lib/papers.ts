@@ -157,6 +157,8 @@ const PUBLISHER_DOI_PATTERNS: {
 export interface PaperMetadata {
   identifier: string;
   identifierType: 'arxiv' | 'doi';
+  doi?: string;  // DOI if available (for both arxiv and doi papers)
+  arxivId?: string;  // arXiv ID if available
   title: string;
   authors: string[];
   abstract: string | null;
@@ -475,6 +477,7 @@ export async function resolveUrlToPaper(url: string): Promise<PaperMetadata | nu
       const canonicalUrl = `https://doi.org/${doi}`;
       return {
         ...crossrefMetadata,
+        doi: doi,
         sourceUrl: url !== canonicalUrl ? url : undefined,
       };
     }
@@ -488,6 +491,7 @@ export async function resolveUrlToPaper(url: string): Promise<PaperMetadata | nu
       return {
         identifier: doi,
         identifierType: 'doi',
+        doi: doi,
         title: scrapedData.title,
         authors: scrapedData.authors || [],
         abstract: scrapedData.abstract || null,
@@ -544,6 +548,7 @@ export async function fetchArxivMetadata(arxivId: string): Promise<PaperMetadata
     return {
       identifier: arxivId,
       identifierType: 'arxiv',
+      arxivId: arxivId,
       title,
       authors,
       abstract,
@@ -584,6 +589,7 @@ export async function fetchDoiMetadata(doi: string): Promise<PaperMetadata | nul
     return {
       identifier: doi,
       identifierType: 'doi',
+      doi: doi,
       title,
       authors,
       abstract,

@@ -105,6 +105,8 @@ export async function POST(request: NextRequest) {
           post_id: paper.postId,
           identifier: paper.identifier,
           identifier_type: paper.identifierType,
+          doi: paper.doi || (paper.identifierType === 'doi' ? paper.identifier : null),
+          arxiv_id: paper.arxivId || (paper.identifierType === 'arxiv' ? paper.identifier : null),
           title: paper.title,
           authors: paper.authors,
           abstract: paper.abstract,
