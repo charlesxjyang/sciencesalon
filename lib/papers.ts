@@ -545,10 +545,23 @@ export async function fetchArxivMetadata(arxivId: string): Promise<PaperMetadata
     const publishedMatch = xml.match(/<published>([\s\S]*?)<\/published>/);
     const publishedDate = publishedMatch?.[1]?.trim() || null;
 
+    // Extract DOI if present in arXiv response (arxiv:doi tag)
+    const doiMatch = xml.match(/<arxiv:doi[^>]*>([\s\S]*?)<\/arxiv:doi>/);
+    let doi = doiMatch?.[1]?.trim() || null;
+
+    // If no DOI in response, construct the arXiv DOI (all arXiv papers have this)
+    // Format: 10.48550/arXiv.XXXX.XXXXX
+    if (!doi) {
+      // Strip version number for DOI (e.g., 2401.12345v2 -> 2401.12345)
+      const baseId = arxivId.replace(/v\d+$/, '');
+      doi = `10.48550/arXiv.${baseId}`;
+    }
+
     return {
       identifier: arxivId,
       identifierType: 'arxiv',
       arxivId: arxivId,
+      doi: doi,
       title,
       authors,
       abstract,
@@ -561,8 +574,20 @@ export async function fetchArxivMetadata(arxivId: string): Promise<PaperMetadata
   }
 }
 
+/**
+ * Extract arXiv ID from a DOI if it's an arXiv DOI
+ * arXiv DOIs are in format: 10.48550/arXiv.XXXX.XXXXX
+ */
+function extractArxivIdFromDoi(doi: string): string | null {
+  const arxivDoiMatch = doi.match(/^10\.48550\/arXiv\.(\d{4}\.\d{4,5})$/i);
+  return arxivDoiMatch ? arxivDoiMatch[1] : null;
+}
+
 export async function fetchDoiMetadata(doi: string): Promise<PaperMetadata | null> {
   try {
+    // Check if this DOI is actually an arXiv DOI
+    const arxivId = extractArxivIdFromDoi(doi);
+
     const response = await fetch(
       `https://api.crossref.org/works/${encodeURIComponent(doi)}`,
       {
@@ -586,10 +611,36 @@ export async function fetchDoiMetadata(doi: string): Promise<PaperMetadata | nul
     const abstract = work.abstract?.replace(/<[^>]*>/g, '') || null;
     const publishedDate = work.published?.['date-parts']?.[0]?.join('-') || null;
 
+    // Check for arXiv relation in Crossref metadata if we don't already have an arXiv ID
+    let detectedArxivId = arxivId;
+    if (!detectedArxivId && work.relation) {
+      // Look for arXiv in relations (is-preprint-of, has-preprint, etc.)
+      const relations = [
+        ...(work.relation['is-preprint-of'] || []),
+        ...(work.relation['has-preprint'] || []),
+        ...(work.relation['is-identical-to'] || []),
+      ];
+      for (const rel of relations) {
+        if (rel['id-type'] === 'arxiv' && rel.id) {
+          detectedArxivId = rel.id;
+          break;
+        }
+        // Also check if it's a URL to arXiv
+        if (rel.id && typeof rel.id === 'string') {
+          const arxivMatch = rel.id.match(/arxiv\.org\/abs\/(\d{4}\.\d{4,5})/i);
+          if (arxivMatch) {
+            detectedArxivId = arxivMatch[1];
+            break;
+          }
+        }
+      }
+    }
+
     return {
       identifier: doi,
       identifierType: 'doi',
       doi: doi,
+      arxivId: detectedArxivId || undefined,
       title,
       authors,
       abstract,

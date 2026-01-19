@@ -61,6 +61,10 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
         }
 
         // Insert paper mention
+        // Generate arXiv DOI (format: 10.48550/arXiv.XXXX.XXXXX)
+        const baseArxivId = paper.arxivId.replace(/v\d+$/, ''); // Strip version
+        const arxivDoi = `10.48550/arXiv.${baseArxivId}`;
+
         const { error: mentionError } = await supabase
           .from("paper_mentions")
           .insert({
@@ -68,7 +72,7 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
             identifier: paper.arxivId,
             identifier_type: "arxiv",
             arxiv_id: paper.arxivId,
-            doi: null,  // arXiv papers from RSS don't have DOI yet
+            doi: arxivDoi,
             title: paper.title,
             authors: paper.authors,
             abstract: paper.abstract,
