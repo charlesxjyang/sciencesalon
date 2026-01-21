@@ -49,7 +49,7 @@ export async function getOrcidProfile(orcidId: string, accessToken: string) {
   }
 
   const data = await response.json();
-  
+
   const givenNames = data.name?.['given-names']?.value || '';
   const familyName = data.name?.['family-name']?.value || '';
   const name = `${givenNames} ${familyName}`.trim() || 'Anonymous Researcher';
@@ -59,4 +59,73 @@ export async function getOrcidProfile(orcidId: string, accessToken: string) {
     name,
     biography: data.biography?.content || null,
   };
+}
+
+export interface OrcidWork {
+  title: string;
+  doi: string | null;
+  publicationYear: number | null;
+  journalTitle: string | null;
+  url: string | null;
+  type: string | null;
+}
+
+export async function getOrcidWorks(orcidId: string): Promise<OrcidWork[]> {
+  const response = await fetch(`${ORCID_API_URL}/${orcidId}/works`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+    next: { revalidate: 3600 }, // Cache for 1 hour
+  });
+
+  if (!response.ok) {
+    console.error(`Failed to fetch ORCID works for ${orcidId}:`, response.status);
+    return [];
+  }
+
+  const data = await response.json();
+  const works: OrcidWork[] = [];
+
+  // ORCID groups works by similarity, we want unique works
+  for (const group of data.group || []) {
+    const workSummary = group['work-summary']?.[0];
+    if (!workSummary) continue;
+
+    const title = workSummary.title?.title?.value || 'Untitled';
+    const publicationYear = workSummary['publication-date']?.year?.value
+      ? parseInt(workSummary['publication-date'].year.value)
+      : null;
+    const journalTitle = workSummary['journal-title']?.value || null;
+    const type = workSummary.type || null;
+
+    // Extract DOI from external IDs
+    let doi: string | null = null;
+    let url: string | null = null;
+
+    for (const extId of workSummary['external-ids']?.['external-id'] || []) {
+      if (extId['external-id-type'] === 'doi') {
+        doi = extId['external-id-value'];
+        url = extId['external-id-url']?.value || `https://doi.org/${doi}`;
+      }
+    }
+
+    // If no DOI but has URL, use that
+    if (!url && workSummary.url?.value) {
+      url = workSummary.url.value;
+    }
+
+    works.push({
+      title,
+      doi,
+      publicationYear,
+      journalTitle,
+      url,
+      type,
+    });
+  }
+
+  // Sort by publication year (newest first)
+  works.sort((a, b) => (b.publicationYear || 0) - (a.publicationYear || 0));
+
+  return works;
 }
