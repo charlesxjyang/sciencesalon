@@ -11,6 +11,7 @@ export interface User {
   is_bot?: boolean;
   bot_category?: string | null;
   bot_last_fetched_at?: string | null;
+  orcid_papers_synced_at?: string | null;
 }
 
 export interface Follow {
@@ -26,6 +27,7 @@ export interface Post {
   content: string;
   created_at: string;
   updated_at: string;
+  is_orcid_import?: boolean;
   author?: User;
   paper_mentions?: PaperMention[];
   link_previews?: LinkPreview[];

@@ -8,18 +8,26 @@ create table if not exists users (
   orcid_id text primary key,
   name text not null,
   bio text,
+  orcid_papers_synced_at timestamp with time zone,
   created_at timestamp with time zone default now()
 );
+
+-- Migration: Add orcid_papers_synced_at column if it doesn't exist
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS orcid_papers_synced_at timestamp with time zone;
 
 -- Posts table
 create table if not exists posts (
   id uuid primary key default gen_random_uuid(),
   author_orcid text not null references users(orcid_id) on delete cascade,
-  content text not null,
+  content text not null default '',
   link_previews jsonb default '[]',
+  is_orcid_import boolean default false,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+-- Migration: Add is_orcid_import column if it doesn't exist
+-- ALTER TABLE posts ADD COLUMN IF NOT EXISTS is_orcid_import boolean default false;
 
 -- Paper mentions (extracted from posts)
 create table if not exists paper_mentions (
@@ -41,6 +49,7 @@ create table if not exists paper_mentions (
 -- Indexes for performance
 create index if not exists posts_author_idx on posts(author_orcid);
 create index if not exists posts_created_idx on posts(created_at desc);
+create index if not exists posts_orcid_import_idx on posts(author_orcid, is_orcid_import) where is_orcid_import = true;
 create index if not exists paper_mentions_post_idx on paper_mentions(post_id);
 create index if not exists paper_mentions_identifier_idx on paper_mentions(identifier);
 create index if not exists paper_mentions_doi_idx on paper_mentions(doi);

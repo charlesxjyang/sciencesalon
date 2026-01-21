@@ -77,11 +77,13 @@ export function PostCard({ post, currentUser }: PostCardProps) {
             )}
             <span className="text-sm text-ink/40">{timeAgo}</span>
           </div>
-          <div className="whitespace-pre-wrap break-words">{post.content}</div>
+          {post.content && (
+            <div className="whitespace-pre-wrap break-words">{post.content}</div>
+          )}
 
           {/* Paper mentions */}
           {post.paper_mentions && post.paper_mentions.length > 0 && (
-            <div className="mt-4 space-y-3">
+            <div className={`${post.content ? "mt-4" : "mt-1"} space-y-3`}>
               {post.paper_mentions.map((paper) => (
                 <PaperCard key={paper.id} paper={paper} />
               ))}

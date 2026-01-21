@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { PostCard } from "@/components/PostCard";
 import { FollowButton } from "@/components/FollowButton";
-import { getOrcidWorks } from "@/lib/orcid";
+import { SyncPapersButton } from "@/components/SyncPapersButton";
 import type { Post } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -58,8 +58,11 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
     isFollowed = !!followData;
   }
 
-  // Fetch user's posts with comments and likes
-  const { data: rawPosts } = await supabase
+  // Check if this is an ORCID user (not Google or bot)
+  const isOrcidUser = !user.orcid_id.startsWith("google_") && !user.is_bot;
+
+  // Build query based on active tab
+  let postsQuery = supabase
     .from("posts")
     .select(`
       *,
@@ -72,6 +75,15 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
     .order("created_at", { ascending: false })
     .limit(50);
 
+  // Filter by tab
+  if (activeTab === "posts") {
+    postsQuery = postsQuery.or("is_orcid_import.is.null,is_orcid_import.eq.false");
+  } else if (activeTab === "papers") {
+    postsQuery = postsQuery.eq("is_orcid_import", true);
+  }
+
+  const { data: rawPosts } = await postsQuery;
+
   // Add counts and user-specific data to each post
   const posts = rawPosts?.map((post) => ({
     ...post,
@@ -83,16 +95,24 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
     likes: undefined,
   }));
 
-  // Check if this is an ORCID user (not Google or bot)
-  const isOrcidUser = !user.orcid_id.startsWith("google_") && !user.is_bot;
+  // Get counts for tabs
+  const { count: postsCount } = await supabase
+    .from("posts")
+    .select("*", { count: "exact", head: true })
+    .eq("author_orcid", params.orcid)
+    .or("is_orcid_import.is.null,is_orcid_import.eq.false");
 
-  // Fetch ORCID works if viewing papers tab and user has ORCID
-  let orcidWorks: Awaited<ReturnType<typeof getOrcidWorks>> = [];
-  if (activeTab === "papers" && isOrcidUser) {
-    orcidWorks = await getOrcidWorks(params.orcid);
-  }
+  const { count: papersCount } = await supabase
+    .from("posts")
+    .select("*", { count: "exact", head: true })
+    .eq("author_orcid", params.orcid)
+    .eq("is_orcid_import", true);
 
   const isOwnProfile = currentUser?.orcid_id === params.orcid;
+
+  // Check if papers need syncing (not synced or synced more than 1 hour ago)
+  const needsSync = isOrcidUser && (!user.orcid_papers_synced_at ||
+    new Date(user.orcid_papers_synced_at) < new Date(Date.now() - 60 * 60 * 1000));
 
   return (
     <div className="min-h-screen">
@@ -218,105 +238,54 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
 
         {/* Tabs - only show if ORCID user */}
         {isOrcidUser && (
-          <div className="flex gap-1 mb-6 border-b border-ink/10">
-            <Link
-              href={`/user/${params.orcid}`}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === "posts"
-                  ? "border-sage text-sage"
-                  : "border-transparent text-ink/60 hover:text-ink"
-              }`}
-            >
-              Posts
-            </Link>
-            <Link
-              href={`/user/${params.orcid}?tab=papers`}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === "papers"
-                  ? "border-sage text-sage"
-                  : "border-transparent text-ink/60 hover:text-ink"
-              }`}
-            >
-              Papers
-            </Link>
+          <div className="flex items-center justify-between mb-6 border-b border-ink/10">
+            <div className="flex gap-1">
+              <Link
+                href={`/user/${params.orcid}`}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === "posts"
+                    ? "border-sage text-sage"
+                    : "border-transparent text-ink/60 hover:text-ink"
+                }`}
+              >
+                Posts {postsCount ? `(${postsCount})` : ""}
+              </Link>
+              <Link
+                href={`/user/${params.orcid}?tab=papers`}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === "papers"
+                    ? "border-sage text-sage"
+                    : "border-transparent text-ink/60 hover:text-ink"
+                }`}
+              >
+                Papers {papersCount ? `(${papersCount})` : ""}
+              </Link>
+            </div>
+            {activeTab === "papers" && needsSync && (
+              <SyncPapersButton orcidId={params.orcid} />
+            )}
           </div>
         )}
 
         {/* Content based on active tab */}
-        {activeTab === "posts" ? (
-          <>
-            {!isOrcidUser && (
-              <h2 className="font-sans text-sm uppercase tracking-wide text-ink/40 mb-4">
-                Posts
-              </h2>
-            )}
-            <div className="space-y-6">
-              {posts && posts.length > 0 ? (
-                posts.map((post) => (
-                  <PostCard key={post.id} post={post as Post} currentUser={currentUser} />
-                ))
-              ) : (
-                <p className="text-center py-12 text-ink/40">
-                  No posts yet.
-                </p>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="space-y-4">
-            {orcidWorks.length > 0 ? (
-              orcidWorks.map((work, index) => (
-                <div key={`${work.doi || index}`} className="paper-card">
-                  <div className="flex flex-col gap-1">
-                    {work.url ? (
-                      <a
-                        href={work.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium hover:text-sage transition-colors"
-                      >
-                        {work.title}
-                      </a>
-                    ) : (
-                      <span className="font-medium">{work.title}</span>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-ink/60">
-                      {work.publicationYear && (
-                        <span>{work.publicationYear}</span>
-                      )}
-                      {work.journalTitle && (
-                        <>
-                          <span>•</span>
-                          <span className="italic">{work.journalTitle}</span>
-                        </>
-                      )}
-                      {work.type && (
-                        <>
-                          <span>•</span>
-                          <span className="capitalize">{work.type.toLowerCase().replace(/-/g, " ")}</span>
-                        </>
-                      )}
-                    </div>
-                    {work.doi && (
-                      <a
-                        href={`https://doi.org/${work.doi}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-sage hover:text-sage/80 transition-colors font-mono"
-                      >
-                        DOI: {work.doi}
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-center py-12 text-ink/40">
-                No papers found in ORCID profile.
-              </p>
-            )}
-          </div>
+        {!isOrcidUser && (
+          <h2 className="font-sans text-sm uppercase tracking-wide text-ink/40 mb-4">
+            Posts
+          </h2>
         )}
+        <div className="space-y-6">
+          {posts && posts.length > 0 ? (
+            posts.map((post) => (
+              <PostCard key={post.id} post={post as Post} currentUser={currentUser} />
+            ))
+          ) : (
+            <p className="text-center py-12 text-ink/40">
+              {activeTab === "papers"
+                ? "No papers synced yet. Click 'Sync from ORCID' to import your publications."
+                : "No posts yet."}
+            </p>
+          )}
+        </div>
       </main>
     </div>
   );
