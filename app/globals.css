@@ -9,13 +9,13 @@
   }
   
   body {
-    @apply bg-cream text-ink;
+    @apply bg-paper text-ink;
   }
 }
 
 @layer components {
   .paper-card {
-    @apply bg-paper border border-sage/20 rounded-lg p-4 hover:border-sage/40 transition-colors;
+    @apply bg-white border border-sage/20 rounded-lg p-4 hover:border-sage/40 transition-colors shadow-sm;
   }
   
   .btn-primary {
@@ -33,7 +33,7 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-cream;
+  @apply bg-paper;
 }
 
 ::-webkit-scrollbar-thumb {

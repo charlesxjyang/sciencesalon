@@ -48,7 +48,7 @@ export default async function FeedPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="border-b border-ink/10 sticky top-0 bg-cream/95 backdrop-blur-sm z-10">
+      <header className="border-b border-ink/10 sticky top-0 bg-paper/95 backdrop-blur-sm z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/" className="text-xl font-serif">
             <span className="text-sage">◆</span> Salon

@@ -88,7 +88,7 @@ export function CommentSection({
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Write a comment..."
-              className="flex-1 text-sm px-3 py-1.5 rounded-full border border-ink/10 bg-cream focus:outline-none focus:border-sage/50 transition-colors"
+              className="flex-1 text-sm px-3 py-1.5 rounded-full border border-ink/10 bg-white focus:outline-none focus:border-sage/50 transition-colors"
               disabled={isSubmitting}
             />
             <button

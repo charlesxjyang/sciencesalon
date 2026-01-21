@@ -36,7 +36,7 @@ export default function LoginPage() {
               <div className="w-full border-t border-ink/10"></div>
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-cream text-ink/40">or</span>
+              <span className="px-2 bg-white text-ink/40">or</span>
             </div>
           </div>
 
