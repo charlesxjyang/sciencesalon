@@ -12,6 +12,14 @@ export interface User {
   bot_category?: string | null;
   bot_last_fetched_at?: string | null;
   orcid_papers_synced_at?: string | null;
+  onboarding_completed?: boolean;
+}
+
+export interface UserInterest {
+  id: string;
+  user_orcid: string;
+  topic_id: string;
+  created_at: string;
 }
 
 export interface Follow {

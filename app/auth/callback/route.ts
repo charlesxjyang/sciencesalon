@@ -35,8 +35,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Upsert user in database
+    // Check if user already exists
     const supabase = createServiceRoleClient();
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("orcid_id, onboarding_completed")
+      .eq("orcid_id", profile.orcidId)
+      .single();
+
+    const isNewUser = !existingUser;
+
+    // Upsert user in database
     const { error: dbError } = await supabase.from("users").upsert(
       {
         orcid_id: profile.orcidId,
@@ -53,10 +62,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create redirect response and set cookies on it
-    console.log("Setting cookies for user:", profile.orcidId);
+    // Determine redirect destination
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://salon.science";
-    const response = NextResponse.redirect(new URL("/feed", appUrl));
+    const needsOnboarding = isNewUser || !existingUser?.onboarding_completed;
+    const redirectPath = needsOnboarding ? "/onboarding" : "/feed";
+
+    // Create redirect response and set cookies on it
+    console.log("Setting cookies for user:", profile.orcidId, "redirecting to:", redirectPath);
+    const response = NextResponse.redirect(new URL(redirectPath, appUrl));
     
     const cookieOptions = {
       httpOnly: false,

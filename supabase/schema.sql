@@ -9,11 +9,22 @@ create table if not exists users (
   name text not null,
   bio text,
   orcid_papers_synced_at timestamp with time zone,
+  onboarding_completed boolean default false,
   created_at timestamp with time zone default now()
 );
 
 -- Migration: Add orcid_papers_synced_at column if it doesn't exist
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS orcid_papers_synced_at timestamp with time zone;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed boolean default false;
+
+-- User interests (selected topics)
+create table if not exists user_interests (
+  id uuid primary key default gen_random_uuid(),
+  user_orcid text not null references users(orcid_id) on delete cascade,
+  topic_id text not null,
+  created_at timestamp with time zone default now(),
+  unique(user_orcid, topic_id)
+);
 
 -- Posts table
 create table if not exists posts (
@@ -62,10 +73,15 @@ create index if not exists paper_mentions_title_trgm_idx on paper_mentions using
 create index if not exists paper_mentions_abstract_trgm_idx on paper_mentions using gin (abstract extensions.gin_trgm_ops);
 create index if not exists paper_mentions_authors_gin_idx on paper_mentions using gin (authors);
 
+-- Indexes for user_interests
+create index if not exists user_interests_user_idx on user_interests(user_orcid);
+create index if not exists user_interests_topic_idx on user_interests(topic_id);
+
 -- Enable Row Level Security
 alter table users enable row level security;
 alter table posts enable row level security;
 alter table paper_mentions enable row level security;
+alter table user_interests enable row level security;
 
 -- RLS Policies (permissive for now - anyone can read, authenticated can write)
 -- For a simple cookie-based auth, we'll use service role for writes
@@ -80,6 +96,10 @@ create policy "Posts are viewable by everyone" on posts
 
 -- Anyone can read paper mentions
 create policy "Paper mentions are viewable by everyone" on paper_mentions
+  for select using (true);
+
+-- Anyone can read user interests
+create policy "User interests are viewable by everyone" on user_interests
   for select using (true);
 
 -- Function to update updated_at timestamp
