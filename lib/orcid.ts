@@ -64,6 +64,7 @@ export async function getOrcidProfile(orcidId: string, accessToken: string) {
 export interface OrcidWork {
   title: string;
   doi: string | null;
+  publicationDate: string | null; // ISO date string YYYY-MM-DD
   publicationYear: number | null;
   journalTitle: string | null;
   url: string | null;
@@ -96,9 +97,24 @@ export async function getOrcidWorks(orcidId: string): Promise<OrcidWork[]> {
     if (!workSummary) continue;
 
     const title = workSummary.title?.title?.value || 'Untitled';
-    const publicationYear = workSummary['publication-date']?.year?.value
-      ? parseInt(workSummary['publication-date'].year.value)
-      : null;
+
+    // Extract full publication date (year, month, day when available)
+    const pubDate = workSummary['publication-date'];
+    const year = pubDate?.year?.value;
+    const month = pubDate?.month?.value;
+    const day = pubDate?.day?.value;
+
+    let publicationDate: string | null = null;
+    let publicationYear: number | null = null;
+
+    if (year) {
+      publicationYear = parseInt(year);
+      // Build ISO date string with available components
+      const mm = month ? month.padStart(2, '0') : '01';
+      const dd = day ? day.padStart(2, '0') : '01';
+      publicationDate = `${year}-${mm}-${dd}`;
+    }
+
     const journalTitle = workSummary['journal-title']?.value || null;
     const type = workSummary.type || null;
 
@@ -121,6 +137,7 @@ export async function getOrcidWorks(orcidId: string): Promise<OrcidWork[]> {
     works.push({
       title,
       doi,
+      publicationDate,
       publicationYear,
       journalTitle,
       url,

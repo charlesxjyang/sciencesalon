@@ -4,9 +4,34 @@ interface PaperCardProps {
   paper: PaperMention;
 }
 
+function formatPublishedDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+
+  try {
+    // Handle YYYY-MM-DD format
+    const [year, month, day] = dateStr.split("-").map(Number);
+    if (!year) return null;
+
+    // If we only have year (month/day are 01/01 defaults), just show year
+    if (month === 1 && day === 1) {
+      return year.toString();
+    }
+
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
 export function PaperCard({ paper }: PaperCardProps) {
   const authorList = paper.authors?.slice(0, 3).join(", ");
   const hasMoreAuthors = paper.authors?.length > 3;
+  const publishedDate = formatPublishedDate(paper.published_date);
 
   return (
     <a
@@ -25,12 +50,16 @@ export function PaperCard({ paper }: PaperCardProps) {
           <h4 className="font-medium leading-snug mb-1 line-clamp-2">
             {paper.title}
           </h4>
-          {authorList && (
-            <p className="text-sm text-ink/60 mb-2">
-              {authorList}
-              {hasMoreAuthors && " et al."}
-            </p>
-          )}
+          <div className="flex flex-wrap items-center gap-x-2 text-sm text-ink/60 mb-1">
+            {authorList && (
+              <span>
+                {authorList}
+                {hasMoreAuthors && " et al."}
+              </span>
+            )}
+            {authorList && publishedDate && <span>•</span>}
+            {publishedDate && <span>{publishedDate}</span>}
+          </div>
           {paper.abstract && (
             <p className="text-sm text-ink/50 line-clamp-2">
               {paper.abstract}

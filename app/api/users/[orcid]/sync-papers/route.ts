@@ -82,15 +82,21 @@ export async function POST(
       if (existingDois.has(work.doi.toLowerCase())) continue;
 
       // Create post for this paper
+      // Use noon UTC to avoid timezone issues causing date to shift
+      let createdAt: string;
+      if (work.publicationDate) {
+        createdAt = `${work.publicationDate}T12:00:00Z`;
+      } else {
+        createdAt = new Date().toISOString();
+      }
+
       const { data: post, error: postError } = await supabase
         .from("posts")
         .insert({
           author_orcid: orcidId,
           content: "",
           is_orcid_import: true,
-          created_at: work.publicationYear
-            ? new Date(`${work.publicationYear}-01-01`).toISOString()
-            : new Date().toISOString(),
+          created_at: createdAt,
         })
         .select()
         .single();
@@ -110,7 +116,7 @@ export async function POST(
           doi: work.doi,
           title: work.title,
           authors: [], // ORCID works endpoint doesn't include authors in summary
-          published_date: work.publicationYear?.toString() || null,
+          published_date: work.publicationDate || null,
           url: work.url || `https://doi.org/${work.doi}`,
         });
 
