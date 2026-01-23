@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Search posts (by content text)
+    // Search posts (by content text AND paper titles)
     if (type === "posts") {
       const postSelect = `
         *,
@@ -205,19 +205,44 @@ export async function GET(req: NextRequest) {
         link_previews
       `;
 
-      const { data: posts, error: postsError } = await supabase
+      const postIdsSet = new Set<string>();
+
+      // Search by post content
+      const { data: postsByContent, error: contentError } = await supabase
         .from("posts")
-        .select(postSelect)
+        .select("id")
         .ilike("content", `%${query}%`)
-        .order("created_at", { ascending: false })
         .limit(30);
 
-      if (postsError) {
-        console.error("Error searching posts:", postsError);
+      if (contentError) {
+        console.error("Error searching posts by content:", contentError);
       }
+      postsByContent?.forEach((p) => postIdsSet.add(p.id));
 
-      if (posts && posts.length > 0) {
-        results.posts = await enrichPostsWithLikes(posts);
+      // Also search by paper title/abstract (to include ORCID imports with empty content)
+      const { data: paperMatches } = await supabase
+        .from("paper_mentions")
+        .select("post_id")
+        .or(`title.ilike.%${query}%,abstract.ilike.%${query}%`)
+        .limit(30);
+      paperMatches?.forEach((p) => postIdsSet.add(p.post_id));
+
+      // Fetch full posts for matching IDs
+      const postIds = Array.from(postIdsSet).slice(0, 30);
+      if (postIds.length > 0) {
+        const { data: posts, error: postsError } = await supabase
+          .from("posts")
+          .select(postSelect)
+          .in("id", postIds)
+          .order("created_at", { ascending: false });
+
+        if (postsError) {
+          console.error("Error searching posts:", postsError);
+        }
+
+        if (posts && posts.length > 0) {
+          results.posts = await enrichPostsWithLikes(posts);
+        }
       }
     }
 
