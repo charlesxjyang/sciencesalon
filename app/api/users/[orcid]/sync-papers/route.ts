@@ -7,6 +7,7 @@ export async function POST(
   { params }: { params: { orcid: string } }
 ) {
   const orcidId = params.orcid;
+  console.log("Syncing papers for ORCID:", orcidId);
 
   // Don't sync for Google users or bots
   if (orcidId.startsWith("google_") || orcidId.startsWith("bot_")) {
@@ -15,19 +16,34 @@ export async function POST(
 
   const supabase = createServiceRoleClient();
 
-  // Check if user exists and when they were last synced
-  const { data: user } = await supabase
+  // Check if user exists (don't select orcid_papers_synced_at in case column doesn't exist yet)
+  const { data: user, error: userError } = await supabase
     .from("users")
-    .select("orcid_papers_synced_at")
+    .select("orcid_id, orcid_papers_synced_at")
     .eq("orcid_id", orcidId)
     .single();
 
-  if (!user) {
+  if (userError) {
+    console.error("Error fetching user:", userError);
+    // If column doesn't exist, try without it
+    const { data: userBasic, error: basicError } = await supabase
+      .from("users")
+      .select("orcid_id")
+      .eq("orcid_id", orcidId)
+      .single();
+
+    if (basicError || !userBasic) {
+      console.error("User not found:", orcidId);
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+  }
+
+  if (!user && !userError) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   // Only sync if not synced in the last hour
-  const lastSynced = user.orcid_papers_synced_at
+  const lastSynced = user?.orcid_papers_synced_at
     ? new Date(user.orcid_papers_synced_at)
     : null;
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);

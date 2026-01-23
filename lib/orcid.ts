@@ -71,7 +71,10 @@ export interface OrcidWork {
 }
 
 export async function getOrcidWorks(orcidId: string): Promise<OrcidWork[]> {
-  const response = await fetch(`${ORCID_API_URL}/${orcidId}/works`, {
+  const url = `${ORCID_API_URL}/${orcidId}/works`;
+  console.log("Fetching ORCID works from:", url);
+
+  const response = await fetch(url, {
     headers: {
       'Accept': 'application/json',
     },
@@ -79,7 +82,8 @@ export async function getOrcidWorks(orcidId: string): Promise<OrcidWork[]> {
   });
 
   if (!response.ok) {
-    console.error(`Failed to fetch ORCID works for ${orcidId}:`, response.status);
+    const errorText = await response.text();
+    console.error(`Failed to fetch ORCID works for ${orcidId}:`, response.status, errorText);
     return [];
   }
 
