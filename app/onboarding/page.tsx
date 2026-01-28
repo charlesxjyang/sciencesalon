@@ -79,7 +79,7 @@ export default function OnboardingPage() {
       });
 
       if (response.ok) {
-        router.push("/feed");
+        router.push("/onboarding/follow");
       } else {
         console.error("Failed to save interests");
       }
@@ -115,6 +115,17 @@ export default function OnboardingPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-8">
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <div className="w-8 h-8 rounded-full bg-sage text-white flex items-center justify-center text-sm font-medium">
+            1
+          </div>
+          <div className="w-12 h-0.5 bg-ink/20" />
+          <div className="w-8 h-8 rounded-full bg-ink/10 text-ink/40 flex items-center justify-center text-sm font-medium">
+            2
+          </div>
+        </div>
+
         <div className="text-center mb-8">
           <h1 className="text-3xl font-serif mb-3">Welcome, {user?.name}!</h1>
           <p className="text-ink/60 max-w-xl mx-auto">

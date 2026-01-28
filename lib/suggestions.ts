@@ -40,20 +40,17 @@ async function getSuggestedUsersFallback(
 ): Promise<SuggestedUser[]> {
   const supabase = createServiceRoleClient();
 
-  // Get current user's interests
+  // Get current user's interests (using topic_id field)
   const { data: myInterests } = await supabase
     .from("user_interests")
-    .select("interest, weight")
+    .select("topic_id")
     .eq("user_orcid", orcidId);
 
   if (!myInterests || myInterests.length === 0) {
     return [];
   }
 
-  const myInterestSet = new Set(myInterests.map((i) => i.interest));
-  const myInterestWeights = new Map(
-    myInterests.map((i) => [i.interest, i.weight])
-  );
+  const myInterestSet = new Set(myInterests.map((i) => i.topic_id));
 
   // Get users I'm already following
   const { data: following } = await supabase
@@ -66,14 +63,14 @@ async function getSuggestedUsersFallback(
   // Get all other users' interests
   const { data: otherInterests } = await supabase
     .from("user_interests")
-    .select("user_orcid, interest, weight")
+    .select("user_orcid, topic_id")
     .neq("user_orcid", orcidId);
 
   if (!otherInterests) {
     return [];
   }
 
-  // Calculate match scores
+  // Calculate match scores (each shared topic = 1 point)
   const userScores = new Map<
     string,
     { score: number; shared: string[]; count: number }
@@ -84,11 +81,7 @@ async function getSuggestedUsersFallback(
     if (followingSet.has(interest.user_orcid)) continue;
 
     // Check if we share this interest
-    if (!myInterestSet.has(interest.interest)) continue;
-
-    const myWeight = myInterestWeights.get(interest.interest) || 0;
-    const theirWeight = interest.weight;
-    const matchScore = myWeight * theirWeight;
+    if (!myInterestSet.has(interest.topic_id)) continue;
 
     const existing = userScores.get(interest.user_orcid) || {
       score: 0,
@@ -96,8 +89,8 @@ async function getSuggestedUsersFallback(
       count: 0,
     };
 
-    existing.score += matchScore;
-    existing.shared.push(interest.interest);
+    existing.score += 1; // Each shared topic adds 1 to score
+    existing.shared.push(interest.topic_id);
     existing.count++;
 
     userScores.set(interest.user_orcid, existing);

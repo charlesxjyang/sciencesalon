@@ -150,3 +150,107 @@ export async function getOrcidWorks(orcidId: string): Promise<OrcidWork[]> {
 
   return works;
 }
+
+export interface OrcidContributor {
+  name: string;
+  orcidId: string | null;
+}
+
+/**
+ * Fetch detailed work information including contributors
+ */
+async function getWorkDetails(orcidId: string, putCode: string): Promise<OrcidContributor[]> {
+  const url = `${ORCID_API_URL}/${orcidId}/work/${putCode}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const work = await response.json();
+  const contributors: OrcidContributor[] = [];
+
+  for (const contributor of work.contributors?.contributor || []) {
+    const creditName = contributor['credit-name']?.value;
+    const contributorOrcid = contributor['contributor-orcid']?.path || null;
+
+    if (creditName) {
+      contributors.push({
+        name: creditName,
+        orcidId: contributorOrcid,
+      });
+    }
+  }
+
+  return contributors;
+}
+
+/**
+ * Get co-authors from a user's ORCID works
+ * Returns unique co-authors with their ORCID IDs (when available)
+ */
+export async function getOrcidCoAuthors(orcidId: string): Promise<OrcidContributor[]> {
+  const url = `${ORCID_API_URL}/${orcidId}/works`;
+
+  const response = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    return [];
+  }
+
+  const data = await response.json();
+  const coAuthorMap = new Map<string, OrcidContributor>();
+
+  // Get put-codes for up to 20 most recent works
+  const putCodes: { putCode: string; orcidId: string }[] = [];
+
+  for (const group of (data.group || []).slice(0, 20)) {
+    const workSummary = group['work-summary']?.[0];
+    if (!workSummary) continue;
+
+    const putCode = workSummary['put-code'];
+    if (putCode) {
+      putCodes.push({ putCode: String(putCode), orcidId });
+    }
+  }
+
+  // Fetch work details in batches of 5 to avoid rate limiting
+  for (let i = 0; i < putCodes.length; i += 5) {
+    const batch = putCodes.slice(i, i + 5);
+    const results = await Promise.all(
+      batch.map(({ putCode, orcidId }) => getWorkDetails(orcidId, putCode))
+    );
+
+    for (const contributors of results) {
+      for (const contributor of contributors) {
+        // Skip if this is the user themselves
+        if (contributor.orcidId === orcidId) continue;
+
+        // Use ORCID ID as key if available, otherwise use normalized name
+        const key = contributor.orcidId || contributor.name.toLowerCase().trim();
+
+        // Prefer entries with ORCID IDs
+        const existing = coAuthorMap.get(key);
+        if (!existing || (contributor.orcidId && !existing.orcidId)) {
+          coAuthorMap.set(key, contributor);
+        }
+      }
+    }
+
+    // Small delay between batches to be nice to the API
+    if (i + 5 < putCodes.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+
+  return Array.from(coAuthorMap.values());
+}

@@ -77,11 +77,53 @@ create index if not exists paper_mentions_authors_gin_idx on paper_mentions usin
 create index if not exists user_interests_user_idx on user_interests(user_orcid);
 create index if not exists user_interests_topic_idx on user_interests(topic_id);
 
+-- Follows table (for user following relationships)
+create table if not exists follows (
+  id uuid primary key default gen_random_uuid(),
+  follower_id text not null references users(orcid_id) on delete cascade,
+  following_id text not null references users(orcid_id) on delete cascade,
+  created_at timestamp with time zone default now(),
+  unique(follower_id, following_id)
+);
+
+-- Indexes for follows
+create index if not exists follows_follower_idx on follows(follower_id);
+create index if not exists follows_following_idx on follows(following_id);
+
+-- Likes table (for post likes)
+create table if not exists likes (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references posts(id) on delete cascade,
+  user_orcid text not null references users(orcid_id) on delete cascade,
+  created_at timestamp with time zone default now(),
+  unique(post_id, user_orcid)
+);
+
+-- Indexes for likes
+create index if not exists likes_post_idx on likes(post_id);
+create index if not exists likes_user_idx on likes(user_orcid);
+
+-- Comments table
+create table if not exists comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references posts(id) on delete cascade,
+  author_orcid text not null references users(orcid_id) on delete cascade,
+  content text not null,
+  created_at timestamp with time zone default now()
+);
+
+-- Indexes for comments
+create index if not exists comments_post_idx on comments(post_id);
+create index if not exists comments_author_idx on comments(author_orcid);
+
 -- Enable Row Level Security
 alter table users enable row level security;
 alter table posts enable row level security;
 alter table paper_mentions enable row level security;
 alter table user_interests enable row level security;
+alter table follows enable row level security;
+alter table likes enable row level security;
+alter table comments enable row level security;
 
 -- RLS Policies (permissive for now - anyone can read, authenticated can write)
 -- For a simple cookie-based auth, we'll use service role for writes
@@ -100,6 +142,18 @@ create policy "Paper mentions are viewable by everyone" on paper_mentions
 
 -- Anyone can read user interests
 create policy "User interests are viewable by everyone" on user_interests
+  for select using (true);
+
+-- Anyone can read follows
+create policy "Follows are viewable by everyone" on follows
+  for select using (true);
+
+-- Anyone can read likes
+create policy "Likes are viewable by everyone" on likes
+  for select using (true);
+
+-- Anyone can read comments
+create policy "Comments are viewable by everyone" on comments
   for select using (true);
 
 -- Function to update updated_at timestamp
