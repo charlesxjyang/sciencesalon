@@ -19,7 +19,17 @@ export default async function FeedPage() {
   const user = JSON.parse(userCookie.value);
   const supabase = createServerSupabaseClient();
 
-  // Fetch posts with authors, paper mentions, comments, and likes
+  // Get list of users the current user follows
+  const { data: following } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", user.orcid_id);
+
+  const followingIds = following?.map((f) => f.following_id) || [];
+  // Include the user's own posts + posts from people they follow
+  const feedUserIds = [user.orcid_id, ...followingIds];
+
+  // Fetch posts from followed users and self
   const { data: rawPosts, error } = await supabase
     .from("posts")
     .select(`
@@ -29,6 +39,7 @@ export default async function FeedPage() {
       comments(*, author:users!comments_author_orcid_fkey(*)),
       likes(user_orcid)
     `)
+    .in("author_orcid", feedUserIds)
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -108,7 +119,13 @@ export default async function FeedPage() {
             ))
           ) : (
             <div className="text-center py-12 text-ink/40">
-              <p>No posts yet. Be the first to share something.</p>
+              <p>No posts in your feed yet.</p>
+              <p className="text-sm mt-2">
+                <Link href="/feeds" className="text-sage hover:underline">
+                  Follow some arXiv feeds
+                </Link>
+                {" "}to see papers here.
+              </p>
             </div>
           )}
         </div>
