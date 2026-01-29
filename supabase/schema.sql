@@ -10,12 +10,18 @@ create table if not exists users (
   bio text,
   orcid_papers_synced_at timestamp with time zone,
   onboarding_completed boolean default false,
+  is_bot boolean default false,
+  bot_category text,
+  bot_last_fetched_at timestamp with time zone,
   created_at timestamp with time zone default now()
 );
 
--- Migration: Add orcid_papers_synced_at column if it doesn't exist
+-- Migration: Add columns if they don't exist
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS orcid_papers_synced_at timestamp with time zone;
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed boolean default false;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot boolean default false;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_category text;
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS bot_last_fetched_at timestamp with time zone;
 
 -- User interests (selected topics)
 create table if not exists user_interests (
