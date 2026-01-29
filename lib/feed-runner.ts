@@ -1,18 +1,18 @@
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { fetchArxivRSS, ArxivPaper } from "@/lib/arxiv-rss";
+import { fetchArxivRSS } from "@/lib/arxiv-rss";
 
-export interface BotRunResult {
+export interface FeedRunResult {
   category: string;
   newPosts: number;
   errors: string[];
 }
 
 /**
- * Run a bot to fetch and post papers from an arXiv category
+ * Run a feed to fetch and post papers from an arXiv category
  */
-export async function runBot(botOrcid: string, category: string): Promise<BotRunResult> {
+export async function runFeed(feedOrcid: string, category: string): Promise<FeedRunResult> {
   const supabase = createServiceRoleClient();
-  const result: BotRunResult = {
+  const result: FeedRunResult = {
     category,
     newPosts: 0,
     errors: [],
@@ -49,7 +49,7 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
         const { data: post, error: postError } = await supabase
           .from("posts")
           .insert({
-            author_orcid: botOrcid,
+            author_orcid: feedOrcid,
             content,
           })
           .select()
@@ -91,11 +91,11 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
       }
     }
 
-    // Update bot's last_fetched_at
+    // Update feed's last_fetched_at
     await supabase
       .from("users")
-      .update({ bot_last_fetched_at: new Date().toISOString() })
-      .eq("orcid_id", botOrcid);
+      .update({ feed_last_fetched_at: new Date().toISOString() })
+      .eq("orcid_id", feedOrcid);
 
   } catch (error) {
     result.errors.push(`Failed to fetch RSS for ${category}: ${error}`);
@@ -105,30 +105,30 @@ export async function runBot(botOrcid: string, category: string): Promise<BotRun
 }
 
 /**
- * Run all bots
+ * Run all feeds
  */
-export async function runAllBots(): Promise<BotRunResult[]> {
+export async function runAllFeeds(): Promise<FeedRunResult[]> {
   const supabase = createServiceRoleClient();
-  const results: BotRunResult[] = [];
+  const results: FeedRunResult[] = [];
 
-  // Fetch all bot users
-  const { data: bots, error } = await supabase
+  // Fetch all feed users
+  const { data: feeds, error } = await supabase
     .from("users")
-    .select("orcid_id, bot_category")
-    .eq("is_bot", true)
-    .not("bot_category", "is", null);
+    .select("orcid_id, feed_category")
+    .eq("is_feed", true)
+    .not("feed_category", "is", null);
 
   if (error) {
-    throw new Error(`Failed to fetch bots: ${error.message}`);
+    throw new Error(`Failed to fetch feeds: ${error.message}`);
   }
 
-  if (!bots || bots.length === 0) {
+  if (!feeds || feeds.length === 0) {
     return results;
   }
 
-  // Run each bot
-  for (const bot of bots) {
-    const result = await runBot(bot.orcid_id, bot.bot_category!);
+  // Run each feed
+  for (const feed of feeds) {
+    const result = await runFeed(feed.orcid_id, feed.feed_category!);
     results.push(result);
   }
 

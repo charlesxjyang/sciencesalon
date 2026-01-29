@@ -1,22 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { runBot, runAllBots } from "@/lib/bot-runner";
+import { runFeed, runAllFeeds } from "@/lib/feed-runner";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes max
 
 /**
- * POST handler for manual bot trigger
- * Can run a specific bot or all bots
+ * POST handler for manual feed trigger
+ * Can run a specific feed or all feeds
  */
 export async function POST(req: NextRequest) {
   // Check for admin authorization
   const authHeader = req.headers.get("authorization");
-  const botSecret = process.env.BOT_SECRET_KEY;
+  const feedSecret = process.env.FEED_SECRET_KEY || process.env.BOT_SECRET_KEY;
 
   // Check Bearer token for API access
-  if (authHeader === `Bearer ${botSecret}`) {
+  if (authHeader === `Bearer ${feedSecret}`) {
     // Authorized via API key
   } else {
     // Check for logged-in admin user
@@ -45,39 +45,39 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { botOrcid, category } = body as { botOrcid?: string; category?: string };
+    const { feedOrcid, category } = body as { feedOrcid?: string; category?: string };
 
     let results;
 
-    if (botOrcid && category) {
-      // Run specific bot
-      console.log(`Running bot ${botOrcid} for category ${category}`);
-      const result = await runBot(botOrcid, category);
+    if (feedOrcid && category) {
+      // Run specific feed
+      console.log(`Running feed ${feedOrcid} for category ${category}`);
+      const result = await runFeed(feedOrcid, category);
       results = [result];
-    } else if (botOrcid) {
-      // Run specific bot by orcid, fetch category from database
+    } else if (feedOrcid) {
+      // Run specific feed by orcid, fetch category from database
       const supabase = createServiceRoleClient();
-      const { data: bot } = await supabase
+      const { data: feed } = await supabase
         .from("users")
-        .select("bot_category")
-        .eq("orcid_id", botOrcid)
-        .eq("is_bot", true)
+        .select("feed_category")
+        .eq("orcid_id", feedOrcid)
+        .eq("is_feed", true)
         .single();
 
-      if (!bot || !bot.bot_category) {
+      if (!feed || !feed.feed_category) {
         return NextResponse.json(
-          { error: "Bot not found" },
+          { error: "Feed not found" },
           { status: 404 }
         );
       }
 
-      console.log(`Running bot ${botOrcid} for category ${bot.bot_category}`);
-      const result = await runBot(botOrcid, bot.bot_category);
+      console.log(`Running feed ${feedOrcid} for category ${feed.feed_category}`);
+      const result = await runFeed(feedOrcid, feed.feed_category);
       results = [result];
     } else {
-      // Run all bots
-      console.log("Running all bots");
-      results = await runAllBots();
+      // Run all feeds
+      console.log("Running all feeds");
+      results = await runAllFeeds();
     }
 
     const totalNewPosts = results.reduce((sum, r) => sum + r.newPosts, 0);
@@ -86,16 +86,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       summary: {
-        botsRun: results.length,
+        feedsRun: results.length,
         totalNewPosts,
         totalErrors,
       },
       results,
     });
   } catch (error) {
-    console.error("Manual bot run failed:", error);
+    console.error("Manual feed run failed:", error);
     return NextResponse.json(
-      { error: "Bot run failed", details: String(error) },
+      { error: "Feed run failed", details: String(error) },
       { status: 500 }
     );
   }

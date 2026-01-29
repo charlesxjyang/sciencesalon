@@ -8,9 +8,9 @@ export interface User {
   followers_count?: number;
   following_count?: number;
   is_followed?: boolean;
-  is_bot?: boolean;
-  bot_category?: string | null;
-  bot_last_fetched_at?: string | null;
+  is_feed?: boolean;
+  feed_category?: string | null;
+  feed_last_fetched_at?: string | null;
   orcid_papers_synced_at?: string | null;
   onboarding_completed?: boolean;
 }

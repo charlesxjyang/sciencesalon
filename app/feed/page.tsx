@@ -74,10 +74,10 @@ export default async function FeedPage() {
               </svg>
             </Link>
             <Link
-              href="/bots"
+              href="/feeds"
               className="text-sm text-ink/60 hover:text-ink transition-colors"
             >
-              Bots
+              Feeds
             </Link>
             <Link
               href={`/user/${user.orcid_id}`}

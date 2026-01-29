@@ -59,7 +59,7 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
   }
 
   // Check if this is an ORCID user (not Google or bot)
-  const isOrcidUser = !user.orcid_id.startsWith("google_") && !user.is_bot;
+  const isOrcidUser = !user.orcid_id.startsWith("google_") && !user.is_feed;
 
   // Build query based on active tab
   let postsQuery = supabase
@@ -100,7 +100,7 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
     .from("posts")
     .select("*", { count: "exact", head: true })
     .eq("author_orcid", params.orcid)
-    .or("is_orcid_import.is.null,is_orcid_import.eq.false");
+    .neq("is_orcid_import", true);
 
   const { count: papersCount } = await supabase
     .from("posts")
@@ -172,20 +172,20 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <h1 className="text-2xl font-serif">{user.name}</h1>
-                    {user.is_bot && (
+                    {user.is_feed && (
                       <span className="px-2 py-0.5 text-xs bg-sage/10 text-sage rounded font-sans">
                         Bot
                       </span>
                     )}
                   </div>
-                  {user.is_bot ? (
+                  {user.is_feed ? (
                     <div className="text-sm text-ink/60">
                       <span className="font-mono bg-ink/5 px-1.5 py-0.5 rounded">
-                        {user.bot_category}
+                        {user.feed_category}
                       </span>
-                      {user.bot_last_fetched_at && (
+                      {user.feed_last_fetched_at && (
                         <span className="ml-2">
-                          Last updated: {new Date(user.bot_last_fetched_at).toLocaleDateString()}
+                          Last updated: {new Date(user.feed_last_fetched_at).toLocaleDateString()}
                         </span>
                       )}
                     </div>

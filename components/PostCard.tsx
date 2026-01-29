@@ -70,9 +70,9 @@ export function PostCard({ post, currentUser }: PostCardProps) {
             >
               {post.author?.name || "Unknown"}
             </Link>
-            {post.author?.is_bot && (
+            {post.author?.is_feed && (
               <span className="px-1.5 py-0.5 text-xs bg-sage/10 text-sage rounded">
-                Bot
+                Feed
               </span>
             )}
             <span className="text-sm text-ink/40">{timeAgo}</span>

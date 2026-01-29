@@ -24,7 +24,7 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   "econ": "Economics",
 };
 
-export default async function BotsPage() {
+export default async function FeedsPage() {
   const supabase = createServerSupabaseClient();
 
   // Get current user
@@ -32,21 +32,21 @@ export default async function BotsPage() {
   const userCookie = cookieStore.get("salon_user");
   const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
 
-  // Fetch all bot users
-  const { data: bots } = await supabase
+  // Fetch all feed users
+  const { data: feeds } = await supabase
     .from("users")
     .select("*")
-    .eq("is_bot", true)
+    .eq("is_feed", true)
     .order("created_at", { ascending: false });
 
-  // Get follower counts for each bot
-  const botOrcids = bots?.map((b) => b.orcid_id) || [];
+  // Get follower counts for each feed
+  const feedOrcids = feeds?.map((f) => f.orcid_id) || [];
 
-  const { data: followerCounts } = botOrcids.length > 0
+  const { data: followerCounts } = feedOrcids.length > 0
     ? await supabase
         .from("follows")
         .select("following_id")
-        .in("following_id", botOrcids)
+        .in("following_id", feedOrcids)
     : { data: [] };
 
   const followersCountMap = new Map<string, number>();
@@ -54,7 +54,7 @@ export default async function BotsPage() {
     followersCountMap.set(f.following_id, (followersCountMap.get(f.following_id) || 0) + 1);
   });
 
-  // Check which bots the current user follows
+  // Check which feeds the current user follows
   let currentUserFollowing: Set<string> = new Set();
   if (currentUser) {
     const { data: followingData } = await supabase
@@ -64,12 +64,12 @@ export default async function BotsPage() {
     currentUserFollowing = new Set(followingData?.map((f) => f.following_id) || []);
   }
 
-  // Get post counts for each bot
-  const { data: postCounts } = botOrcids.length > 0
+  // Get post counts for each feed
+  const { data: postCounts } = feedOrcids.length > 0
     ? await supabase
         .from("posts")
         .select("author_orcid")
-        .in("author_orcid", botOrcids)
+        .in("author_orcid", feedOrcids)
     : { data: [] };
 
   const postCountMap = new Map<string, number>();
@@ -126,26 +126,26 @@ export default async function BotsPage() {
       <main className="max-w-2xl mx-auto px-6 py-8">
         {/* Page header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-serif mb-2">arXiv Bots</h1>
+          <h1 className="text-2xl font-serif mb-2">arXiv Feeds</h1>
           <p className="text-ink/60">
-            Follow bots to see the latest papers from specific arXiv categories in your feed.
+            Follow feeds to see the latest papers from specific arXiv categories in your feed.
           </p>
         </div>
 
-        {/* Bots grid */}
+        {/* Feeds grid */}
         <div className="space-y-4">
-          {bots && bots.length > 0 ? (
-            bots.map((bot) => {
-              const isFollowed = currentUserFollowing.has(bot.orcid_id);
-              const followerCount = followersCountMap.get(bot.orcid_id) || 0;
-              const postCount = postCountMap.get(bot.orcid_id) || 0;
-              const categoryDescription = bot.bot_category ? (CATEGORY_DESCRIPTIONS[bot.bot_category] || bot.bot_category) : "";
+          {feeds && feeds.length > 0 ? (
+            feeds.map((feed) => {
+              const isFollowed = currentUserFollowing.has(feed.orcid_id);
+              const followerCount = followersCountMap.get(feed.orcid_id) || 0;
+              const postCount = postCountMap.get(feed.orcid_id) || 0;
+              const categoryDescription = feed.feed_category ? (CATEGORY_DESCRIPTIONS[feed.feed_category] || feed.feed_category) : "";
 
               return (
-                <div key={bot.orcid_id} className="paper-card">
+                <div key={feed.orcid_id} className="paper-card">
                   <div className="flex items-start gap-3">
                     <Link
-                      href={`/user/${bot.orcid_id}`}
+                      href={`/user/${feed.orcid_id}`}
                       className="w-12 h-12 rounded-full bg-sage/20 flex items-center justify-center text-sage flex-shrink-0"
                     >
                       <svg
@@ -158,43 +158,43 @@ export default async function BotsPage() {
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                          d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z"
                         />
                       </svg>
                     </Link>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <Link
-                          href={`/user/${bot.orcid_id}`}
+                          href={`/user/${feed.orcid_id}`}
                           className="font-medium hover:text-sage transition-colors"
                         >
-                          {bot.name}
+                          {feed.name}
                         </Link>
                         <span className="px-1.5 py-0.5 text-xs bg-sage/10 text-sage rounded">
-                          Bot
+                          Feed
                         </span>
                       </div>
                       <p className="text-sm text-ink/60 mb-2">
-                        {bot.bio || `Posts new papers from arXiv ${categoryDescription}`}
+                        {feed.bio || `Posts new papers from arXiv ${categoryDescription}`}
                       </p>
                       <div className="flex items-center gap-4 text-xs text-ink/40">
-                        {bot.bot_category && (
+                        {feed.feed_category && (
                           <span className="font-mono bg-ink/5 px-1.5 py-0.5 rounded">
-                            {bot.bot_category}
+                            {feed.feed_category}
                           </span>
                         )}
                         <span>{postCount} posts</span>
                         <span>{followerCount} followers</span>
-                        {bot.bot_last_fetched_at && (
+                        {feed.feed_last_fetched_at && (
                           <span>
-                            Last updated: {new Date(bot.bot_last_fetched_at).toLocaleDateString()}
+                            Last updated: {new Date(feed.feed_last_fetched_at).toLocaleDateString()}
                           </span>
                         )}
                       </div>
                     </div>
                     {currentUser && (
                       <FollowButton
-                        userId={bot.orcid_id}
+                        userId={feed.orcid_id}
                         initialIsFollowing={isFollowed}
                         initialFollowersCount={followerCount}
                       />
@@ -205,7 +205,7 @@ export default async function BotsPage() {
             })
           ) : (
             <div className="text-center py-12">
-              <p className="text-ink/40">No bots available yet.</p>
+              <p className="text-ink/40">No feeds available yet.</p>
             </div>
           )}
         </div>

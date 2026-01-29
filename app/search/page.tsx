@@ -8,7 +8,7 @@ import { PostCard } from "@/components/PostCard";
 import type { User, Post } from "@/lib/types";
 
 interface SearchUser extends User {
-  is_bot?: boolean;
+  is_feed?: boolean;
   followers_count?: number;
   is_followed?: boolean;
 }
@@ -105,10 +105,10 @@ function SearchContent() {
           {currentUser && (
             <div className="flex items-center gap-4">
               <Link
-                href="/bots"
+                href="/feeds"
                 className="text-sm text-ink/60 hover:text-ink transition-colors"
               >
-                Bots
+                Feeds
               </Link>
               <Link
                 href={`/user/${currentUser.orcid_id}`}
@@ -148,7 +148,7 @@ function SearchContent() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search users, bots, or papers..."
+              placeholder="Search users, feeds, or papers..."
               className="w-full pl-10 pr-4 py-3 border border-ink/10 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage/20 focus:border-sage transition-colors"
               autoFocus
             />
@@ -207,7 +207,7 @@ function SearchContent() {
                           href={`/user/${user.orcid_id}`}
                           className="w-10 h-10 rounded-full bg-sage/20 flex items-center justify-center text-sage font-sans text-sm hover:bg-sage/30 transition-colors flex-shrink-0"
                         >
-                          {user.is_bot ? (
+                          {user.is_feed ? (
                             <svg
                               className="w-5 h-5"
                               fill="none"
@@ -233,17 +233,17 @@ function SearchContent() {
                             >
                               {user.name}
                             </Link>
-                            {user.is_bot && (
+                            {user.is_feed && (
                               <span className="px-1.5 py-0.5 text-xs bg-sage/10 text-sage rounded">
-                                Bot
+                                Feed
                               </span>
                             )}
                           </div>
-                          {user.is_bot && user.bot_category ? (
+                          {user.is_feed && user.feed_category ? (
                             <p className="text-sm text-ink/60">
                               arXiv{" "}
                               <span className="font-mono bg-ink/5 px-1 rounded">
-                                {user.bot_category}
+                                {user.feed_category}
                               </span>
                             </p>
                           ) : user.bio ? (
@@ -305,7 +305,7 @@ function SearchContent() {
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
             </svg>
-            <p>Search for users, bots, or papers</p>
+            <p>Search for users, feeds, or papers</p>
             <p className="text-sm mt-2">Enter at least 2 characters to search</p>
           </div>
         )}
