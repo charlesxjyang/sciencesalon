@@ -117,12 +117,18 @@ export default function OnboardingPage() {
       <main className="max-w-4xl mx-auto px-6 py-8">
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="w-8 h-8 rounded-full bg-sage text-white flex items-center justify-center text-sm font-medium">
-            1
+          <div className="w-8 h-8 rounded-full bg-sage/20 text-sage flex items-center justify-center text-sm font-medium">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-          <div className="w-12 h-0.5 bg-ink/20" />
-          <div className="w-8 h-8 rounded-full bg-ink/10 text-ink/40 flex items-center justify-center text-sm font-medium">
+          <div className="w-8 h-0.5 bg-sage" />
+          <div className="w-8 h-8 rounded-full bg-sage text-white flex items-center justify-center text-sm font-medium">
             2
+          </div>
+          <div className="w-8 h-0.5 bg-ink/20" />
+          <div className="w-8 h-8 rounded-full bg-ink/10 text-ink/40 flex items-center justify-center text-sm font-medium">
+            3
           </div>
         </div>
 

@@ -7,7 +7,9 @@ create extension if not exists pg_trgm schema extensions;
 create table if not exists users (
   orcid_id text primary key,
   name text not null,
+  username text unique,
   bio text,
+  post_count integer default 0,
   orcid_papers_synced_at timestamp with time zone,
   onboarding_completed boolean default false,
   is_feed boolean default false,
@@ -15,6 +17,9 @@ create table if not exists users (
   feed_last_fetched_at timestamp with time zone,
   created_at timestamp with time zone default now()
 );
+
+-- Index for username lookups
+create index if not exists users_username_idx on users(username);
 
 -- Migration: Add columns if they don't exist
 -- ALTER TABLE users ADD COLUMN IF NOT EXISTS orcid_papers_synced_at timestamp with time zone;

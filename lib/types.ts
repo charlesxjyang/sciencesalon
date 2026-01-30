@@ -1,12 +1,14 @@
 export interface User {
   orcid_id: string;
   name: string;
+  username?: string | null;
   bio: string | null;
   created_at: string;
   auth_provider?: 'orcid' | 'google';
   email?: string;
   followers_count?: number;
   following_count?: number;
+  post_count?: number;
   is_followed?: boolean;
   is_feed?: boolean;
   feed_category?: string | null;
