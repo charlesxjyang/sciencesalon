@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { validateUsername } from "../check/route";
+import { validateUsername } from "@/lib/username";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
