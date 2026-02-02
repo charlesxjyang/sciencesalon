@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { extractScholarId } from "@/lib/google-scholar";
+import { extractScholarId, getScholarWorks } from "@/lib/google-scholar";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
@@ -54,5 +54,70 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to set Google Scholar ID" }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, scholarId });
+  // Sync papers immediately (one-time during onboarding)
+  let syncedCount = 0;
+  try {
+    const works = await getScholarWorks(scholarId);
+
+    for (const work of works) {
+      const normalizedTitle = work.title.toLowerCase().trim();
+
+      // Create post for this paper
+      let createdAt: string;
+      if (work.year) {
+        createdAt = `${work.year}-01-01T12:00:00Z`;
+      } else {
+        createdAt = new Date().toISOString();
+      }
+
+      const { data: post, error: postError } = await supabase
+        .from("posts")
+        .insert({
+          author_orcid: user.orcid_id,
+          content: "",
+          is_orcid_import: true,
+          created_at: createdAt,
+        })
+        .select()
+        .single();
+
+      if (postError || !post) {
+        console.error("Error creating post for Scholar paper:", postError);
+        continue;
+      }
+
+      // Create paper mention
+      const { error: mentionError } = await supabase
+        .from("paper_mentions")
+        .insert({
+          post_id: post.id,
+          identifier: normalizedTitle,
+          identifier_type: "doi",
+          title: work.title,
+          authors: work.authors,
+          published_date: work.year ? `${work.year}-01-01` : null,
+          url: work.url || `https://scholar.google.com/scholar?q=${encodeURIComponent(work.title)}`,
+        });
+
+      if (mentionError) {
+        console.error("Error creating paper mention:", mentionError);
+        await supabase.from("posts").delete().eq("id", post.id);
+        continue;
+      }
+
+      syncedCount++;
+    }
+
+    // Update sync timestamp
+    await supabase
+      .from("users")
+      .update({ google_scholar_synced_at: new Date().toISOString() })
+      .eq("orcid_id", user.orcid_id);
+
+  } catch (error) {
+    console.error("Error syncing Scholar papers:", error);
+    // Don't fail the whole request if sync fails - Scholar ID is still set
+  }
+
+  return NextResponse.json({ success: true, scholarId, syncedPapers: syncedCount });
 }
