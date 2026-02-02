@@ -5,19 +5,31 @@ import { useRouter } from "next/navigation";
 
 interface SyncPapersButtonProps {
   orcidId: string;
+  hasScholarId?: boolean;
 }
 
-export function SyncPapersButton({ orcidId }: SyncPapersButtonProps) {
+export function SyncPapersButton({ orcidId, hasScholarId }: SyncPapersButtonProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const router = useRouter();
+
+  const isGoogleUser = orcidId.startsWith("google_");
+  const syncEndpoint = isGoogleUser && hasScholarId
+    ? `/api/users/${orcidId}/sync-scholar`
+    : `/api/users/${orcidId}/sync-papers`;
+  const syncLabel = isGoogleUser ? "Sync from Google Scholar" : "Sync from ORCID";
+
+  // Don't show sync button for Google users without Scholar ID
+  if (isGoogleUser && !hasScholarId) {
+    return null;
+  }
 
   async function handleSync() {
     setIsSyncing(true);
     setSyncResult(null);
 
     try {
-      const response = await fetch(`/api/users/${orcidId}/sync-papers`, {
+      const response = await fetch(syncEndpoint, {
         method: "POST",
       });
 
@@ -91,7 +103,7 @@ export function SyncPapersButton({ orcidId }: SyncPapersButtonProps) {
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            Sync from ORCID
+            {syncLabel}
           </>
         )}
       </button>

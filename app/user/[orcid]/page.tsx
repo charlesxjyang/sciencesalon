@@ -60,6 +60,11 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
 
   // Check if this is an ORCID user (not Google or bot)
   const isOrcidUser = !user.orcid_id.startsWith("google_") && !user.is_feed;
+  const isGoogleUser = user.orcid_id.startsWith("google_");
+  const hasScholarId = !!user.google_scholar_id;
+
+  // Show papers tab for ORCID users or Google users with Scholar ID
+  const canShowPapers = isOrcidUser || (isGoogleUser && hasScholarId);
 
   // Build query based on active tab
   let postsQuery = supabase
@@ -111,8 +116,12 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
   const isOwnProfile = currentUser?.orcid_id === params.orcid;
 
   // Check if papers need syncing (not synced or synced more than 1 hour ago)
-  const needsSync = isOrcidUser && (!user.orcid_papers_synced_at ||
-    new Date(user.orcid_papers_synced_at) < new Date(Date.now() - 60 * 60 * 1000));
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const needsOrcidSync = isOrcidUser && (!user.orcid_papers_synced_at ||
+    new Date(user.orcid_papers_synced_at) < oneHourAgo);
+  const needsScholarSync = isGoogleUser && hasScholarId && (!user.google_scholar_synced_at ||
+    new Date(user.google_scholar_synced_at) < oneHourAgo);
+  const needsSync = needsOrcidSync || needsScholarSync;
 
   return (
     <div className="min-h-screen">
@@ -189,7 +198,7 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
                         </span>
                       )}
                     </div>
-                  ) : !user.orcid_id.startsWith("google_") ? (
+                  ) : !isGoogleUser ? (
                     <a
                       href={`https://orcid.org/${user.orcid_id}`}
                       target="_blank"
@@ -197,6 +206,15 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
                       className="text-sm text-sage hover:text-sage/80 transition-colors"
                     >
                       ORCID: {user.orcid_id}
+                    </a>
+                  ) : hasScholarId ? (
+                    <a
+                      href={`https://scholar.google.com/citations?user=${user.google_scholar_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-sage hover:text-sage/80 transition-colors"
+                    >
+                      Google Scholar
                     </a>
                   ) : (
                     <span className="text-sm text-ink/40">Google user</span>
@@ -236,8 +254,8 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
           </div>
         </div>
 
-        {/* Tabs - only show if ORCID user */}
-        {isOrcidUser && (
+        {/* Tabs - show for ORCID users or Google users with Scholar ID */}
+        {canShowPapers && (
           <div className="flex items-center justify-between mb-6 border-b border-ink/10">
             <div className="flex gap-1">
               <Link
@@ -262,13 +280,13 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
               </Link>
             </div>
             {activeTab === "papers" && needsSync && (
-              <SyncPapersButton orcidId={params.orcid} />
+              <SyncPapersButton orcidId={params.orcid} hasScholarId={hasScholarId} />
             )}
           </div>
         )}
 
         {/* Content based on active tab */}
-        {!isOrcidUser && (
+        {!canShowPapers && (
           <h2 className="font-sans text-sm uppercase tracking-wide text-ink/40 mb-4">
             Posts
           </h2>
@@ -281,7 +299,9 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
           ) : (
             <p className="text-center py-12 text-ink/40">
               {activeTab === "papers"
-                ? "No papers synced yet. Click 'Sync from ORCID' to import your publications."
+                ? isGoogleUser
+                  ? "No papers synced yet. Click 'Sync from Google Scholar' to import your publications."
+                  : "No papers synced yet. Click 'Sync from ORCID' to import your publications."
                 : "No posts yet."}
             </p>
           )}
