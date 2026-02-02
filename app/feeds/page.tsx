@@ -32,6 +32,17 @@ export default async function FeedsPage() {
   const userCookie = cookieStore.get("salon_user");
   const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
 
+  // Get user's username for profile link
+  let currentUserUsername = currentUser?.username;
+  if (currentUser && !currentUserUsername) {
+    const { data: userData } = await supabase
+      .from("users")
+      .select("username")
+      .eq("orcid_id", currentUser.orcid_id)
+      .single();
+    currentUserUsername = userData?.username;
+  }
+
   // Fetch all feed users
   const { data: feeds } = await supabase
     .from("users")
@@ -107,7 +118,7 @@ export default async function FeedsPage() {
                 </svg>
               </Link>
               <Link
-                href={`/user/${currentUser.orcid_id}`}
+                href={currentUserUsername ? `/${currentUserUsername}` : `/user/${currentUser.orcid_id}`}
                 className="text-sm text-ink/60 hover:text-ink transition-colors"
               >
                 {currentUser.name}

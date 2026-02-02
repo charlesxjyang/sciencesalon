@@ -7,6 +7,7 @@ import { FollowButton } from "./FollowButton";
 interface SuggestedUser {
   orcid_id: string;
   name: string;
+  username: string | null;
   bio: string | null;
   match_score: number;
   shared_count: number;
@@ -58,17 +59,19 @@ export function SuggestedUsers() {
         Based on your research
       </h3>
       <div className="space-y-4">
-        {users.slice(0, 5).map((user) => (
+        {users.slice(0, 5).map((user) => {
+          const userLink = user.username ? `/${user.username}` : `/user/${user.orcid_id}`;
+          return (
           <div key={user.orcid_id} className="flex items-start gap-3">
             <Link
-              href={`/user/${user.orcid_id}`}
+              href={userLink}
               className="w-10 h-10 rounded-full bg-sage/20 flex items-center justify-center text-sage font-sans text-sm hover:bg-sage/30 transition-colors flex-shrink-0"
             >
               {user.name.charAt(0)}
             </Link>
             <div className="flex-1 min-w-0">
               <Link
-                href={`/user/${user.orcid_id}`}
+                href={userLink}
                 className="font-medium hover:text-sage transition-colors text-sm"
               >
                 {user.name}
@@ -92,7 +95,8 @@ export function SuggestedUsers() {
               initialFollowersCount={0}
             />
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );

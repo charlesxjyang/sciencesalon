@@ -19,6 +19,14 @@ export default async function FeedPage() {
   const user = JSON.parse(userCookie.value);
   const supabase = createServerSupabaseClient();
 
+  // Get user's username for profile link
+  const { data: userData } = await supabase
+    .from("users")
+    .select("username")
+    .eq("orcid_id", user.orcid_id)
+    .single();
+  const userUsername = userData?.username;
+
   // Get list of users the current user follows
   const { data: following } = await supabase
     .from("follows")
@@ -91,7 +99,7 @@ export default async function FeedPage() {
               Feeds
             </Link>
             <Link
-              href={`/user/${user.orcid_id}`}
+              href={userUsername ? `/${userUsername}` : `/user/${user.orcid_id}`}
               className="text-sm text-ink/60 hover:text-ink transition-colors"
             >
               {user.name}

@@ -8,10 +8,12 @@ interface CommentCardProps {
 export function CommentCard({ comment }: CommentCardProps) {
   const timeAgo = getTimeAgo(new Date(comment.created_at));
 
+  const authorLink = comment.author?.username ? `/${comment.author.username}` : `/user/${comment.author_orcid}`;
+
   return (
     <div className="flex gap-2 py-2">
       <Link
-        href={`/user/${comment.author_orcid}`}
+        href={authorLink}
         className="w-7 h-7 rounded-full bg-sage/15 flex items-center justify-center text-sage font-sans text-xs hover:bg-sage/25 transition-colors flex-shrink-0"
       >
         {comment.author?.name?.charAt(0) || "?"}
@@ -19,7 +21,7 @@ export function CommentCard({ comment }: CommentCardProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
           <Link
-            href={`/user/${comment.author_orcid}`}
+            href={authorLink}
             className="text-sm font-medium hover:text-sage transition-colors"
           >
             {comment.author?.name || "Unknown"}

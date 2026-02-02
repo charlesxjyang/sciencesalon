@@ -111,7 +111,7 @@ function SearchContent() {
                 Feeds
               </Link>
               <Link
-                href={`/user/${currentUser.orcid_id}`}
+                href={currentUser.username ? `/${currentUser.username}` : `/user/${currentUser.orcid_id}`}
                 className="text-sm text-ink/60 hover:text-ink transition-colors"
               >
                 {currentUser.name}
@@ -200,11 +200,13 @@ function SearchContent() {
             {activeTab === "users" && users.length > 0 && (
               <section>
                 <div className="space-y-3">
-                  {users.map((user) => (
+                  {users.map((user) => {
+                    const userLink = user.username ? `/${user.username}` : `/user/${user.orcid_id}`;
+                    return (
                     <div key={user.orcid_id} className="paper-card">
                       <div className="flex items-center gap-3">
                         <Link
-                          href={`/user/${user.orcid_id}`}
+                          href={userLink}
                           className="w-10 h-10 rounded-full bg-sage/20 flex items-center justify-center text-sage font-sans text-sm hover:bg-sage/30 transition-colors flex-shrink-0"
                         >
                           {user.is_feed ? (
@@ -228,7 +230,7 @@ function SearchContent() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <Link
-                              href={`/user/${user.orcid_id}`}
+                              href={userLink}
                               className="font-medium hover:text-sage transition-colors"
                             >
                               {user.name}
@@ -261,7 +263,8 @@ function SearchContent() {
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </section>
             )}

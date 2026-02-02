@@ -57,7 +57,7 @@ export function PostCard({ post, currentUser }: PostCardProps) {
     <article className="paper-card">
       <div className="flex gap-3">
         <Link
-          href={`/user/${post.author_orcid}`}
+          href={post.author?.username ? `/${post.author.username}` : `/user/${post.author_orcid}`}
           className="w-10 h-10 rounded-full bg-sage/20 flex items-center justify-center text-sage font-sans text-sm hover:bg-sage/30 transition-colors flex-shrink-0"
         >
           {post.author?.name?.charAt(0) || "?"}
@@ -65,7 +65,7 @@ export function PostCard({ post, currentUser }: PostCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2 mb-1">
             <Link
-              href={`/user/${post.author_orcid}`}
+              href={post.author?.username ? `/${post.author.username}` : `/user/${post.author_orcid}`}
               className="font-medium hover:text-sage transition-colors"
             >
               {post.author?.name || "Unknown"}

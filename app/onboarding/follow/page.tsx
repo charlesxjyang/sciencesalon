@@ -293,10 +293,11 @@ interface UserCardProps {
 }
 
 function UserCard({ user, isFollowing, onToggle, badge, sharedInterests }: UserCardProps) {
+  const userLink = user.username ? `/${user.username}` : `/user/${user.orcid_id}`;
   return (
     <div className="flex items-center gap-4 p-4 bg-white rounded-lg border border-ink/10 hover:border-sage/30 transition-colors">
       <Link
-        href={`/user/${user.orcid_id}`}
+        href={userLink}
         className="w-12 h-12 rounded-full bg-sage/20 flex items-center justify-center text-sage font-medium text-lg hover:bg-sage/30 transition-colors flex-shrink-0"
       >
         {user.name.charAt(0)}
@@ -304,7 +305,7 @@ function UserCard({ user, isFollowing, onToggle, badge, sharedInterests }: UserC
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <Link
-            href={`/user/${user.orcid_id}`}
+            href={userLink}
             className="font-medium hover:text-sage transition-colors truncate"
           >
             {user.name}

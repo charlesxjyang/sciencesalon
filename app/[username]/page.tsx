@@ -1,0 +1,329 @@
+import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { PostCard } from "@/components/PostCard";
+import { FollowButton } from "@/components/FollowButton";
+import { SyncPapersButton } from "@/components/SyncPapersButton";
+import type { Post } from "@/lib/types";
+
+export const dynamic = "force-dynamic";
+
+interface UserPageProps {
+  params: { username: string };
+  searchParams: { tab?: string };
+}
+
+export default async function UserPage({ params, searchParams }: UserPageProps) {
+  const supabase = createServerSupabaseClient();
+  const activeTab = searchParams.tab || "posts";
+
+  // Fetch user by username
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("username", params.username)
+    .single();
+
+  if (userError || !user) {
+    notFound();
+  }
+
+  // Get current user for header
+  const cookieStore = cookies();
+  const userCookie = cookieStore.get("salon_user");
+  const currentUser = userCookie ? JSON.parse(userCookie.value) : null;
+
+  // Fetch followers count
+  const { count: followersCount } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("following_id", user.orcid_id);
+
+  // Fetch following count
+  const { count: followingCount } = await supabase
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("follower_id", user.orcid_id);
+
+  // Check if current user follows this profile
+  let isFollowed = false;
+  if (currentUser && currentUser.orcid_id !== user.orcid_id) {
+    const { data: followData } = await supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", currentUser.orcid_id)
+      .eq("following_id", user.orcid_id)
+      .single();
+    isFollowed = !!followData;
+  }
+
+  // Check if this is an ORCID user (not Google or bot)
+  const isOrcidUser = !user.orcid_id.startsWith("google_") && !user.is_feed;
+  const isGoogleUser = user.orcid_id.startsWith("google_");
+  const hasScholarId = !!user.google_scholar_id;
+
+  // Show papers tab for ORCID users or Google users with Scholar ID
+  const canShowPapers = isOrcidUser || (isGoogleUser && hasScholarId);
+
+  // Build query based on active tab
+  let postsQuery = supabase
+    .from("posts")
+    .select(`
+      *,
+      author:users!posts_author_orcid_fkey(*),
+      paper_mentions(*),
+      comments(*, author:users!comments_author_orcid_fkey(*)),
+      likes(user_orcid)
+    `)
+    .eq("author_orcid", user.orcid_id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  // Filter by tab
+  if (activeTab === "posts") {
+    postsQuery = postsQuery.or("is_orcid_import.is.null,is_orcid_import.eq.false");
+  } else if (activeTab === "papers") {
+    postsQuery = postsQuery.eq("is_orcid_import", true);
+  }
+
+  const { data: rawPosts } = await postsQuery;
+
+  // Add counts and user-specific data to each post
+  const posts = rawPosts?.map((post) => ({
+    ...post,
+    comments_count: post.comments?.length || 0,
+    likes_count: post.likes?.length || 0,
+    user_liked: currentUser
+      ? post.likes?.some((like: { user_orcid: string }) => like.user_orcid === currentUser.orcid_id)
+      : false,
+    likes: undefined,
+  }));
+
+  // Get counts for tabs
+  const { count: postsCount } = await supabase
+    .from("posts")
+    .select("*", { count: "exact", head: true })
+    .eq("author_orcid", user.orcid_id)
+    .neq("is_orcid_import", true);
+
+  const { count: papersCount } = await supabase
+    .from("posts")
+    .select("*", { count: "exact", head: true })
+    .eq("author_orcid", user.orcid_id)
+    .eq("is_orcid_import", true);
+
+  const isOwnProfile = currentUser?.orcid_id === user.orcid_id;
+
+  // Check if papers need syncing (not synced or synced more than 1 hour ago)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const needsOrcidSync = isOrcidUser && (!user.orcid_papers_synced_at ||
+    new Date(user.orcid_papers_synced_at) < oneHourAgo);
+  const needsScholarSync = isGoogleUser && hasScholarId && (!user.google_scholar_synced_at ||
+    new Date(user.google_scholar_synced_at) < oneHourAgo);
+  const needsSync = needsOrcidSync || needsScholarSync;
+
+  // Get current user's username for header link
+  let currentUserUsername = currentUser?.username;
+  if (currentUser && !currentUserUsername) {
+    const { data: currentUserData } = await supabase
+      .from("users")
+      .select("username")
+      .eq("orcid_id", currentUser.orcid_id)
+      .single();
+    currentUserUsername = currentUserData?.username;
+  }
+
+  return (
+    <div className="min-h-screen">
+      {/* Header */}
+      <header className="border-b border-ink/10 sticky top-0 bg-paper/95 backdrop-blur-sm z-10">
+        <div className="max-w-2xl mx-auto px-6 py-4 flex justify-between items-center">
+          <Link href="/feed" className="text-xl font-serif">
+            <span className="text-sage">&#9670;</span> Salon
+          </Link>
+          {currentUser && (
+            <div className="flex items-center gap-4">
+              <Link
+                href="/search"
+                className="text-ink/60 hover:text-ink transition-colors"
+                aria-label="Search"
+              >
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+              </Link>
+              <Link
+                href={currentUserUsername ? `/${currentUserUsername}` : `/user/${currentUser.orcid_id}`}
+                className="text-sm text-ink/60 hover:text-ink transition-colors"
+              >
+                {currentUser.name}
+              </Link>
+              <Link
+                href="/auth/logout"
+                className="text-sm text-ink/40 hover:text-ink/60 transition-colors"
+              >
+                Sign out
+              </Link>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Profile */}
+      <main className="max-w-2xl mx-auto px-6 py-8">
+        <div className="paper-card mb-8">
+          <div className="flex items-start gap-4">
+            <div className="w-16 h-16 rounded-full bg-sage/20 flex items-center justify-center text-sage font-sans text-xl">
+              {user.name.charAt(0)}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl font-serif">{user.name}</h1>
+                    {user.is_feed && (
+                      <span className="px-2 py-0.5 text-xs bg-sage/10 text-sage rounded font-sans">
+                        Bot
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-ink/60 mb-1">@{user.username}</div>
+                  {user.is_feed ? (
+                    <div className="text-sm text-ink/60">
+                      <a
+                        href={`https://rss.arxiv.org/rss/${user.feed_category}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono bg-ink/5 px-1.5 py-0.5 rounded text-sage hover:text-sage/80 transition-colors"
+                      >
+                        {user.feed_category}
+                      </a>
+                      {user.feed_last_fetched_at && (
+                        <span className="ml-2">
+                          Last updated: {new Date(user.feed_last_fetched_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  ) : !isGoogleUser ? (
+                    <a
+                      href={`https://orcid.org/${user.orcid_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-sage hover:text-sage/80 transition-colors"
+                    >
+                      ORCID: {user.orcid_id}
+                    </a>
+                  ) : hasScholarId ? (
+                    <a
+                      href={`https://scholar.google.com/citations?user=${user.google_scholar_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-sage hover:text-sage/80 transition-colors"
+                    >
+                      Google Scholar
+                    </a>
+                  ) : (
+                    <span className="text-sm text-ink/40">Google user</span>
+                  )}
+                </div>
+                {currentUser && !isOwnProfile && (
+                  <FollowButton
+                    userId={user.orcid_id}
+                    initialIsFollowing={isFollowed}
+                    initialFollowersCount={followersCount || 0}
+                  />
+                )}
+              </div>
+
+              {/* Follower/Following counts */}
+              <div className="flex gap-4 mt-3 text-sm">
+                <Link
+                  href={`/${params.username}/followers`}
+                  className="hover:text-sage transition-colors"
+                >
+                  <span className="font-medium">{followersCount || 0}</span>{" "}
+                  <span className="text-ink/60">followers</span>
+                </Link>
+                <Link
+                  href={`/${params.username}/following`}
+                  className="hover:text-sage transition-colors"
+                >
+                  <span className="font-medium">{followingCount || 0}</span>{" "}
+                  <span className="text-ink/60">following</span>
+                </Link>
+              </div>
+
+              {user.bio && (
+                <p className="mt-3 text-ink/70">{user.bio}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs - show for ORCID users or Google users with Scholar ID */}
+        {canShowPapers && (
+          <div className="flex items-center justify-between mb-6 border-b border-ink/10">
+            <div className="flex gap-1">
+              <Link
+                href={`/${params.username}`}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === "posts"
+                    ? "border-sage text-sage"
+                    : "border-transparent text-ink/60 hover:text-ink"
+                }`}
+              >
+                Posts {postsCount ? `(${postsCount})` : ""}
+              </Link>
+              <Link
+                href={`/${params.username}?tab=papers`}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeTab === "papers"
+                    ? "border-sage text-sage"
+                    : "border-transparent text-ink/60 hover:text-ink"
+                }`}
+              >
+                Papers {papersCount ? `(${papersCount})` : ""}
+              </Link>
+            </div>
+            {activeTab === "papers" && needsSync && (
+              <SyncPapersButton orcidId={user.orcid_id} hasScholarId={hasScholarId} />
+            )}
+          </div>
+        )}
+
+        {/* Content based on active tab */}
+        {!canShowPapers && (
+          <h2 className="font-sans text-sm uppercase tracking-wide text-ink/40 mb-4">
+            Posts
+          </h2>
+        )}
+        <div className="space-y-6">
+          {posts && posts.length > 0 ? (
+            posts.map((post) => (
+              <PostCard key={post.id} post={post as Post} currentUser={currentUser} />
+            ))
+          ) : (
+            <p className="text-center py-12 text-ink/40">
+              {activeTab === "papers"
+                ? isGoogleUser
+                  ? "No papers synced yet. Click 'Sync from Google Scholar' to import your publications."
+                  : "No papers synced yet. Click 'Sync from ORCID' to import your publications."
+                : "No posts yet."}
+            </p>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}
