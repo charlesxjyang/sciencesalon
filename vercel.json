@@ -4,5 +4,10 @@
       "path": "/api/feeds/cron",
       "schedule": "0 8 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/scholar.py": {
+      "maxDuration": 60
+    }
+  }
 }

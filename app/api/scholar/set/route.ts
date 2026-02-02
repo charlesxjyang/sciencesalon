@@ -12,21 +12,22 @@ interface ScholarPaper {
 }
 
 async function fetchScholarPapers(scholarId: string): Promise<ScholarPaper[]> {
-  const scraperUrl = process.env.SCHOLAR_SCRAPER_URL;
+  // Use Vercel Python function for scholarly scraping
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://salon.science';
+  const response = await fetch(`${baseUrl}/api/scholar?user=${scholarId}`, {
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
 
-  if (scraperUrl) {
-    // Use Python scholarly service
-    const response = await fetch(`${scraperUrl}/papers?user=${scholarId}`);
-    if (!response.ok) {
-      throw new Error(`Scholar scraper returned ${response.status}`);
-    }
-    const data = await response.json();
-    return data.papers || [];
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('Scholar scraper error:', error);
+    throw new Error(`Scholar scraper returned ${response.status}`);
   }
 
-  // Fallback: direct scraping (may be blocked on cloud servers)
-  const { getScholarWorks } = await import("@/lib/google-scholar");
-  return getScholarWorks(scholarId);
+  const data = await response.json();
+  return data.papers || [];
 }
 
 export async function POST(request: NextRequest) {
