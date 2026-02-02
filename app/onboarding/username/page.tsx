@@ -18,7 +18,6 @@ export default function UsernameOnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [user, setUser] = useState<UserData | null>(null);
-  const [suggestedUsername, setSuggestedUsername] = useState("");
 
   // Google Scholar state (only for Google OAuth users)
   const [scholarUrl, setScholarUrl] = useState("");
@@ -42,17 +41,6 @@ export default function UsernameOnboardingPage() {
       const value = decodeURIComponent(userCookie.split("=")[1]);
       const userData = JSON.parse(value);
       setUser(userData);
-
-      // Generate suggested username from name
-      if (userData.name) {
-        const suggested = userData.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]/g, "")
-          .slice(0, 15);
-        if (suggested.length >= 4) {
-          setSuggestedUsername(suggested);
-        }
-      }
     } catch {
       router.push("/login");
     }
@@ -158,8 +146,8 @@ export default function UsernameOnboardingPage() {
 
     if (!isAvailable || !username) return;
 
-    // For Google users, Scholar URL is optional but if provided must be valid
-    if (isGoogleUser && scholarUrl && scholarValid === false) return;
+    // For Google users, Scholar URL is required
+    if (isGoogleUser && !scholarValid) return;
 
     setIsSaving(true);
 
@@ -178,8 +166,8 @@ export default function UsernameOnboardingPage() {
         return;
       }
 
-      // Set Google Scholar ID if provided (for Google users)
-      if (isGoogleUser && scholarUrl) {
+      // Set Google Scholar ID (required for Google users)
+      if (isGoogleUser) {
         const scholarResponse = await fetch("/api/scholar/set", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -202,12 +190,8 @@ export default function UsernameOnboardingPage() {
     }
   }
 
-  function useSuggested() {
-    setUsername(suggestedUsername);
-    checkUsername(suggestedUsername);
-  }
-
-  const canSubmit = isAvailable && (!isGoogleUser || !scholarUrl || scholarValid);
+  // For Google users, Scholar URL is required
+  const canSubmit = isAvailable && (!isGoogleUser || scholarValid);
 
   return (
     <div className="min-h-screen">
@@ -321,20 +305,7 @@ export default function UsernameOnboardingPage() {
             </ul>
           </div>
 
-          {suggestedUsername && suggestedUsername !== username && (
-            <div className="p-3 bg-sage/5 rounded-lg">
-              <p className="text-sm text-ink/60 mb-2">Suggested based on your name:</p>
-              <button
-                type="button"
-                onClick={useSuggested}
-                className="text-sage font-medium hover:underline"
-              >
-                @{suggestedUsername}
-              </button>
-            </div>
-          )}
-
-          {/* Google Scholar Section (only for Google OAuth users) */}
+          {/* Google Scholar Section (required for Google OAuth users) */}
           {isGoogleUser && (
             <>
               <hr className="border-ink/10" />
@@ -342,10 +313,10 @@ export default function UsernameOnboardingPage() {
               <div>
                 <label htmlFor="scholarUrl" className="block text-sm font-medium text-ink/80 mb-2">
                   Google Scholar Profile
-                  <span className="text-ink/40 font-normal ml-1">(optional)</span>
+                  <span className="text-red-500 font-normal ml-1">*</span>
                 </label>
                 <p className="text-sm text-ink/50 mb-3">
-                  Link your Google Scholar profile to import your publications.
+                  Link your Google Scholar profile to verify your research identity.
                 </p>
                 <div className="relative">
                   <input
