@@ -189,9 +189,14 @@ export default async function UserPage({ params, searchParams }: UserPageProps) 
                   </div>
                   {user.is_feed ? (
                     <div className="text-sm text-ink/60">
-                      <span className="font-mono bg-ink/5 px-1.5 py-0.5 rounded">
+                      <a
+                        href={`https://rss.arxiv.org/rss/${user.feed_category}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono bg-ink/5 px-1.5 py-0.5 rounded text-sage hover:text-sage/80 transition-colors"
+                      >
                         {user.feed_category}
-                      </span>
+                      </a>
                       {user.feed_last_fetched_at && (
                         <span className="ml-2">
                           Last updated: {new Date(user.feed_last_fetched_at).toLocaleDateString()}
