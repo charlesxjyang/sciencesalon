@@ -3,34 +3,6 @@ import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 import { extractScholarId } from "@/lib/google-scholar";
 
-interface ScholarPaper {
-  title: string;
-  authors: string[];
-  year: number | null;
-  doi: string | null;
-  arxiv_id?: string | null;
-  url: string | null;
-}
-
-async function fetchScholarPapers(scholarId: string): Promise<ScholarPaper[]> {
-  // Use Vercel Python function for scholarly scraping
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://salon.science';
-  const response = await fetch(`${baseUrl}/api/scholar?user=${scholarId}`, {
-    headers: {
-      'Accept': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Scholar scraper error:', error);
-    throw new Error(`Scholar scraper returned ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.papers || [];
-}
-
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
   // Check onboarding cookie first (during onboarding), then regular user cookie
@@ -74,7 +46,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "This Google Scholar profile is already linked to another account" }, { status: 400 });
   }
 
-  // Set the Google Scholar ID
+  // Set the Google Scholar ID (papers will be synced later via profile page button)
   const { error: updateError } = await supabase
     .from("users")
     .update({ google_scholar_id: scholarId })
@@ -85,90 +57,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to set Google Scholar ID" }, { status: 500 });
   }
 
-  // Sync papers immediately (one-time during onboarding)
-  let syncedCount = 0;
-  try {
-    const works = await fetchScholarPapers(scholarId);
-
-    for (const work of works) {
-      const normalizedTitle = work.title.toLowerCase().trim();
-
-      // Create post for this paper
-      let createdAt: string;
-      if (work.year) {
-        createdAt = `${work.year}-01-01T12:00:00Z`;
-      } else {
-        createdAt = new Date().toISOString();
-      }
-
-      const { data: post, error: postError } = await supabase
-        .from("posts")
-        .insert({
-          author_orcid: user.orcid_id,
-          content: "",
-          is_orcid_import: true,
-          created_at: createdAt,
-        })
-        .select()
-        .single();
-
-      if (postError || !post) {
-        console.error("Error creating post for Scholar paper:", postError);
-        continue;
-      }
-
-      // Create paper mention
-      let paperUrl: string;
-      let identifierType: "doi" | "arxiv" = "doi";
-      let identifier: string;
-
-      if (work.doi) {
-        paperUrl = `https://doi.org/${work.doi}`;
-        identifier = work.doi;
-        identifierType = "doi";
-      } else if (work.arxiv_id) {
-        paperUrl = `https://arxiv.org/abs/${work.arxiv_id}`;
-        identifier = work.arxiv_id;
-        identifierType = "arxiv";
-      } else {
-        paperUrl = work.url || `https://scholar.google.com/scholar?q=${encodeURIComponent(work.title)}`;
-        identifier = normalizedTitle;
-        identifierType = "doi";
-      }
-
-      const { error: mentionError } = await supabase
-        .from("paper_mentions")
-        .insert({
-          post_id: post.id,
-          identifier: identifier,
-          identifier_type: identifierType,
-          doi: work.doi || null,
-          arxiv_id: work.arxiv_id || null,
-          title: work.title,
-          authors: work.authors,
-          published_date: work.year ? `${work.year}-01-01` : null,
-          url: paperUrl,
-        });
-
-      if (mentionError) {
-        console.error("Error creating paper mention:", mentionError);
-        await supabase.from("posts").delete().eq("id", post.id);
-        continue;
-      }
-
-      syncedCount++;
-    }
-
-    // Update sync timestamp
-    await supabase
-      .from("users")
-      .update({ google_scholar_synced_at: new Date().toISOString() })
-      .eq("orcid_id", user.orcid_id);
-
-  } catch (error) {
-    console.error("Error syncing Scholar papers:", error);
-    // Don't fail the whole request if sync fails - Scholar ID is still set
-  }
-
-  return NextResponse.json({ success: true, scholarId, syncedPapers: syncedCount });
+  return NextResponse.json({ success: true, scholarId });
 }
