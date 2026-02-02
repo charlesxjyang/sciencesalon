@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { extractScholarId, validateScholarProfile } from "@/lib/google-scholar";
+import { extractScholarId } from "@/lib/google-scholar";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
@@ -25,10 +25,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Could not extract Scholar ID from URL" }, { status: 400 });
   }
 
-  // Validate the profile exists
-  const validation = await validateScholarProfile(scholarId);
-  if (!validation.valid) {
-    return NextResponse.json({ error: "Google Scholar profile not found" }, { status: 400 });
+  // Validate Scholar ID format
+  if (!/^[a-zA-Z0-9_-]{8,20}$/.test(scholarId)) {
+    return NextResponse.json({ error: "Invalid Google Scholar ID format" }, { status: 400 });
   }
 
   const supabase = createServiceRoleClient();
@@ -55,5 +54,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to set Google Scholar ID" }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, scholarId, name: validation.name });
+  return NextResponse.json({ success: true, scholarId });
 }

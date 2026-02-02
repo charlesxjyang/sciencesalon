@@ -19,12 +19,11 @@ export default function UsernameOnboardingPage() {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const [user, setUser] = useState<UserData | null>(null);
 
-  // Google Scholar state (only for Google OAuth users)
+  // Google Scholar state (required for Google OAuth users)
   const [scholarUrl, setScholarUrl] = useState("");
   const [isCheckingScholar, setIsCheckingScholar] = useState(false);
   const [scholarError, setScholarError] = useState<string | null>(null);
   const [scholarValid, setScholarValid] = useState<boolean | null>(null);
-  const [scholarName, setScholarName] = useState<string | null>(null);
 
   const isGoogleUser = user?.provider === "google";
 
@@ -79,7 +78,6 @@ export default function UsernameOnboardingPage() {
     if (!value) {
       setScholarValid(null);
       setScholarError(null);
-      setScholarName(null);
       return;
     }
 
@@ -92,11 +90,9 @@ export default function UsernameOnboardingPage() {
 
       if (data.valid) {
         setScholarValid(true);
-        setScholarName(data.name);
         setScholarError(null);
       } else {
         setScholarValid(false);
-        setScholarName(null);
         setScholarError(data.error || "Invalid Google Scholar profile");
       }
     } catch {
@@ -138,7 +134,6 @@ export default function UsernameOnboardingPage() {
   function handleScholarUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
     setScholarUrl(e.target.value);
     setScholarValid(null);
-    setScholarName(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -371,9 +366,9 @@ export default function UsernameOnboardingPage() {
                   )}
                 </div>
                 {scholarError && <p className="mt-2 text-sm text-red-600">{scholarError}</p>}
-                {scholarValid && scholarName && (
+                {scholarValid && (
                   <p className="mt-2 text-sm text-green-600">
-                    Found profile: {scholarName}
+                    Valid Google Scholar URL
                   </p>
                 )}
               </div>
