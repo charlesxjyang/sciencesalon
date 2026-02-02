@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { extractScholarId, getScholarWorks } from "@/lib/google-scholar";
+import { extractScholarId } from "@/lib/google-scholar";
+
+interface ScholarPaper {
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  url: string | null;
+}
+
+async function fetchScholarPapers(scholarId: string): Promise<ScholarPaper[]> {
+  const scraperUrl = process.env.SCHOLAR_SCRAPER_URL;
+
+  if (scraperUrl) {
+    // Use Python scholarly service
+    const response = await fetch(`${scraperUrl}/papers?user=${scholarId}`);
+    if (!response.ok) {
+      throw new Error(`Scholar scraper returned ${response.status}`);
+    }
+    const data = await response.json();
+    return data.papers || [];
+  }
+
+  // Fallback: direct scraping (may be blocked on cloud servers)
+  const { getScholarWorks } = await import("@/lib/google-scholar");
+  return getScholarWorks(scholarId);
+}
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
@@ -60,7 +86,7 @@ export async function POST(request: NextRequest) {
   // Sync papers immediately (one-time during onboarding)
   let syncedCount = 0;
   try {
-    const works = await getScholarWorks(scholarId);
+    const works = await fetchScholarPapers(scholarId);
 
     for (const work of works) {
       const normalizedTitle = work.title.toLowerCase().trim();
