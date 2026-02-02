@@ -21,34 +21,31 @@ class handler(BaseHTTPRequestHandler):
 
             papers = []
             author = scholarly.search_author_id(scholar_id)
+            # Only fill author to get publications list, don't fill each pub (too slow)
             author = scholarly.fill(author, sections=['publications'])
 
-            for pub in author.get('publications', [])[:100]:
-                # Try to fill publication to get more details (DOI, etc.)
-                try:
-                    filled_pub = scholarly.fill(pub)
-                except:
-                    filled_pub = pub
+            for pub in author.get('publications', [])[:50]:
+                bib = pub.get('bib', {})
 
-                bib = filled_pub.get('bib', {})
+                # Get URL from pub_url or eprint_url
+                url = pub.get('pub_url') or pub.get('eprint_url')
 
                 paper = {
                     'title': bib.get('title', ''),
                     'authors': bib.get('author', '').split(' and ') if bib.get('author') else [],
                     'year': int(bib.get('pub_year')) if bib.get('pub_year') else None,
-                    'citations': filled_pub.get('num_citations', 0),
-                    'doi': bib.get('doi'),
-                    'url': filled_pub.get('pub_url') or filled_pub.get('eprint_url'),
+                    'citations': pub.get('num_citations', 0),
+                    'doi': None,
+                    'arxiv_id': None,
+                    'url': url,
                 }
 
-                # Try to extract DOI from URL
-                if not paper['doi'] and paper['url']:
-                    if 'doi.org/' in paper['url']:
-                        paper['doi'] = paper['url'].split('doi.org/')[-1]
-                    elif 'arxiv.org/abs/' in paper['url']:
-                        # Extract arXiv ID
-                        arxiv_id = paper['url'].split('arxiv.org/abs/')[-1]
-                        paper['arxiv_id'] = arxiv_id
+                # Try to extract DOI or arXiv ID from URL
+                if url:
+                    if 'doi.org/' in url:
+                        paper['doi'] = url.split('doi.org/')[-1].split('?')[0]
+                    elif 'arxiv.org/abs/' in url:
+                        paper['arxiv_id'] = url.split('arxiv.org/abs/')[-1].split('?')[0]
 
                 papers.append(paper)
 
