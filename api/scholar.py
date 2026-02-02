@@ -24,20 +24,31 @@ class handler(BaseHTTPRequestHandler):
             author = scholarly.fill(author, sections=['publications'])
 
             for pub in author.get('publications', [])[:100]:
-                bib = pub.get('bib', {})
+                # Try to fill publication to get more details (DOI, etc.)
+                try:
+                    filled_pub = scholarly.fill(pub)
+                except:
+                    filled_pub = pub
+
+                bib = filled_pub.get('bib', {})
 
                 paper = {
                     'title': bib.get('title', ''),
                     'authors': bib.get('author', '').split(' and ') if bib.get('author') else [],
                     'year': int(bib.get('pub_year')) if bib.get('pub_year') else None,
-                    'citations': pub.get('num_citations', 0),
+                    'citations': filled_pub.get('num_citations', 0),
                     'doi': bib.get('doi'),
-                    'url': pub.get('pub_url') or pub.get('eprint_url'),
+                    'url': filled_pub.get('pub_url') or filled_pub.get('eprint_url'),
                 }
 
                 # Try to extract DOI from URL
-                if not paper['doi'] and paper['url'] and 'doi.org/' in paper['url']:
-                    paper['doi'] = paper['url'].split('doi.org/')[-1]
+                if not paper['doi'] and paper['url']:
+                    if 'doi.org/' in paper['url']:
+                        paper['doi'] = paper['url'].split('doi.org/')[-1]
+                    elif 'arxiv.org/abs/' in paper['url']:
+                        # Extract arXiv ID
+                        arxiv_id = paper['url'].split('arxiv.org/abs/')[-1]
+                        paper['arxiv_id'] = arxiv_id
 
                 papers.append(paper)
 

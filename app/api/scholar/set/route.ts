@@ -8,6 +8,7 @@ interface ScholarPaper {
   authors: string[];
   year: number | null;
   doi: string | null;
+  arxiv_id?: string | null;
   url: string | null;
 }
 
@@ -117,16 +118,36 @@ export async function POST(request: NextRequest) {
       }
 
       // Create paper mention
+      let paperUrl: string;
+      let identifierType: "doi" | "arxiv" = "doi";
+      let identifier: string;
+
+      if (work.doi) {
+        paperUrl = `https://doi.org/${work.doi}`;
+        identifier = work.doi;
+        identifierType = "doi";
+      } else if (work.arxiv_id) {
+        paperUrl = `https://arxiv.org/abs/${work.arxiv_id}`;
+        identifier = work.arxiv_id;
+        identifierType = "arxiv";
+      } else {
+        paperUrl = work.url || `https://scholar.google.com/scholar?q=${encodeURIComponent(work.title)}`;
+        identifier = normalizedTitle;
+        identifierType = "doi";
+      }
+
       const { error: mentionError } = await supabase
         .from("paper_mentions")
         .insert({
           post_id: post.id,
-          identifier: normalizedTitle,
-          identifier_type: "doi",
+          identifier: identifier,
+          identifier_type: identifierType,
+          doi: work.doi || null,
+          arxiv_id: work.arxiv_id || null,
           title: work.title,
           authors: work.authors,
           published_date: work.year ? `${work.year}-01-01` : null,
-          url: work.url || `https://scholar.google.com/scholar?q=${encodeURIComponent(work.title)}`,
+          url: paperUrl,
         });
 
       if (mentionError) {
