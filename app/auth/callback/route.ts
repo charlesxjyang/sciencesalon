@@ -87,11 +87,19 @@ export async function GET(request: NextRequest) {
       domain: "salon.science",
     };
 
-    response.cookies.set("salon_user", JSON.stringify({
+    const userData = {
       orcid_id: profile.orcidId,
       name: profile.name,
       provider: "orcid",
-    }), cookieOptions);
+    };
+
+    if (redirectPath === "/feed") {
+      // User already completed onboarding, set the real cookie
+      response.cookies.set("salon_user", JSON.stringify(userData), cookieOptions);
+    } else {
+      // User needs onboarding, set temporary cookie
+      response.cookies.set("salon_onboarding", JSON.stringify(userData), cookieOptions);
+    }
 
     response.cookies.set("salon_token", access_token, cookieOptions);
 

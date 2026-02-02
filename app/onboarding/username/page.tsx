@@ -29,15 +29,15 @@ export default function UsernameOnboardingPage() {
 
   useEffect(() => {
     const cookies = document.cookie.split(";");
-    const userCookie = cookies.find((c) => c.trim().startsWith("salon_user="));
+    const onboardingCookie = cookies.find((c) => c.trim().startsWith("salon_onboarding="));
 
-    if (!userCookie) {
+    if (!onboardingCookie) {
       router.push("/login");
       return;
     }
 
     try {
-      const value = decodeURIComponent(userCookie.split("=")[1]);
+      const value = decodeURIComponent(onboardingCookie.split("=")[1]);
       const userData = JSON.parse(value);
       setUser(userData);
     } catch {

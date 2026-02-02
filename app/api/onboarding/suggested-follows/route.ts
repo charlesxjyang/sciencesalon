@@ -20,13 +20,16 @@ export interface SuggestedFollow {
  */
 export async function GET() {
   const cookieStore = cookies();
+  // Check onboarding cookie first (during onboarding), then regular user cookie
+  const onboardingCookie = cookieStore.get("salon_onboarding");
   const userCookie = cookieStore.get("salon_user");
+  const authCookie = onboardingCookie || userCookie;
 
-  if (!userCookie) {
+  if (!authCookie) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const currentUser = JSON.parse(userCookie.value);
+  const currentUser = JSON.parse(authCookie.value);
   const supabase = createServiceRoleClient();
   const suggestions: SuggestedFollow[] = [];
   const addedUserIds = new Set<string>();

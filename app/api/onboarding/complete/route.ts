@@ -5,13 +5,16 @@ import { TOPICS } from "@/lib/topics";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
+  // Check onboarding cookie first (during onboarding), then regular user cookie
+  const onboardingCookie = cookieStore.get("salon_onboarding");
   const userCookie = cookieStore.get("salon_user");
+  const authCookie = onboardingCookie || userCookie;
 
-  if (!userCookie) {
+  if (!authCookie) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = JSON.parse(userCookie.value);
+  const user = JSON.parse(authCookie.value);
   const { topics } = await request.json();
 
   // Validate topics
@@ -41,15 +44,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Mark onboarding as completed
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({ onboarding_completed: true })
-      .eq("orcid_id", user.orcid_id);
-
-    if (updateError) {
-      console.error("Error updating onboarding status:", updateError);
-    }
+    // Note: onboarding_completed is now set in /api/onboarding/finalize
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -88,16 +88,20 @@ export async function GET(request: NextRequest) {
       domain: "salon.science",
     };
 
-    response.cookies.set(
-      "salon_user",
-      JSON.stringify({
-        orcid_id: `google_${profile.googleId}`,
-        name: profile.name,
-        provider: "google",
-        email: profile.email,
-      }),
-      cookieOptions
-    );
+    const userData = {
+      orcid_id: `google_${profile.googleId}`,
+      name: profile.name,
+      provider: "google",
+      email: profile.email,
+    };
+
+    if (redirectPath === "/feed") {
+      // User already completed onboarding, set the real cookie
+      response.cookies.set("salon_user", JSON.stringify(userData), cookieOptions);
+    } else {
+      // User needs onboarding, set temporary cookie
+      response.cookies.set("salon_onboarding", JSON.stringify(userData), cookieOptions);
+    }
 
     response.cookies.set("salon_token", access_token, cookieOptions);
 

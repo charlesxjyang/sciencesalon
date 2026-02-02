@@ -5,13 +5,16 @@ import { extractScholarId, getScholarWorks } from "@/lib/google-scholar";
 
 export async function POST(request: NextRequest) {
   const cookieStore = cookies();
+  // Check onboarding cookie first (during onboarding), then regular user cookie
+  const onboardingCookie = cookieStore.get("salon_onboarding");
   const userCookie = cookieStore.get("salon_user");
+  const authCookie = onboardingCookie || userCookie;
 
-  if (!userCookie) {
+  if (!authCookie) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const user = JSON.parse(userCookie.value);
+  const user = JSON.parse(authCookie.value);
   const { url } = await request.json();
 
   // Allow empty/null to skip

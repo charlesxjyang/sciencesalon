@@ -16,17 +16,17 @@ export default function OnboardingPage() {
   const topicsByCategory = getTopicsByCategory();
 
   useEffect(() => {
-    // Get user from cookie and fetch suggested topics
+    // Get user from onboarding cookie and fetch suggested topics
     const cookies = document.cookie.split(";");
-    const userCookie = cookies.find((c) => c.trim().startsWith("salon_user="));
+    const onboardingCookie = cookies.find((c) => c.trim().startsWith("salon_onboarding="));
 
-    if (!userCookie) {
+    if (!onboardingCookie) {
       router.push("/login");
       return;
     }
 
     try {
-      const value = decodeURIComponent(userCookie.split("=")[1]);
+      const value = decodeURIComponent(onboardingCookie.split("=")[1]);
       const userData = JSON.parse(value);
       setUser(userData);
 

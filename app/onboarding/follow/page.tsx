@@ -22,15 +22,15 @@ export default function FollowOnboardingPage() {
 
   useEffect(() => {
     const cookies = document.cookie.split(";");
-    const userCookie = cookies.find((c) => c.trim().startsWith("salon_user="));
+    const onboardingCookie = cookies.find((c) => c.trim().startsWith("salon_onboarding="));
 
-    if (!userCookie) {
+    if (!onboardingCookie) {
       router.push("/login");
       return;
     }
 
     try {
-      const value = decodeURIComponent(userCookie.split("=")[1]);
+      const value = decodeURIComponent(onboardingCookie.split("=")[1]);
       const userData = JSON.parse(value);
       setUser(userData);
       fetchSuggestions();
@@ -74,6 +74,10 @@ export default function FollowOnboardingPage() {
       );
 
       await Promise.all(followPromises);
+
+      // Finalize onboarding (sets real cookie, clears temp cookie)
+      await fetch("/api/onboarding/finalize", { method: "POST" });
+
       router.push("/feed");
     } catch (error) {
       console.error("Error following users:", error);
@@ -82,7 +86,9 @@ export default function FollowOnboardingPage() {
     }
   }
 
-  function handleSkip() {
+  async function handleSkip() {
+    // Finalize onboarding even when skipping
+    await fetch("/api/onboarding/finalize", { method: "POST" });
     router.push("/feed");
   }
 
