@@ -6,6 +6,7 @@ export interface User {
   created_at: string;
   auth_provider?: 'orcid' | 'google';
   email?: string;
+  google_scholar_id?: string | null;
   followers_count?: number;
   following_count?: number;
   post_count?: number;
@@ -14,6 +15,7 @@ export interface User {
   feed_category?: string | null;
   feed_last_fetched_at?: string | null;
   orcid_papers_synced_at?: string | null;
+  google_scholar_synced_at?: string | null;
   onboarding_completed?: boolean;
 }
 

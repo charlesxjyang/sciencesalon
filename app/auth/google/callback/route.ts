@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const googleOrcidId = `google_${profile.googleId}`;
     const { data: existingUser } = await supabase
       .from("users")
-      .select("orcid_id, onboarding_completed")
+      .select("orcid_id, username, onboarding_completed")
       .eq("orcid_id", googleOrcidId)
       .single();
 
@@ -65,8 +65,15 @@ export async function GET(request: NextRequest) {
 
     // Determine redirect destination
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://salon.science";
-    const needsOnboarding = isNewUser || !existingUser?.onboarding_completed;
-    const redirectPath = needsOnboarding ? "/onboarding" : "/feed";
+    let redirectPath = "/feed";
+
+    if (isNewUser || !existingUser?.username) {
+      // New user or user without username - start at username selection
+      redirectPath = "/onboarding/username";
+    } else if (!existingUser?.onboarding_completed) {
+      // Has username but hasn't completed full onboarding
+      redirectPath = "/onboarding";
+    }
 
     // Create redirect response and set cookies on it
     console.log("Setting cookies for Google user:", profile.googleId, "redirecting to:", redirectPath);

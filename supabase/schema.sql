@@ -3,7 +3,7 @@
 -- Enable pg_trgm extension for fuzzy text search (in extensions schema per Supabase best practice)
 create extension if not exists pg_trgm schema extensions;
 
--- Users table (populated from ORCID)
+-- Users table (populated from ORCID or Google)
 create table if not exists users (
   orcid_id text primary key,
   name text not null,
@@ -11,6 +11,8 @@ create table if not exists users (
   bio text,
   post_count integer default 0,
   orcid_papers_synced_at timestamp with time zone,
+  google_scholar_id text,
+  google_scholar_synced_at timestamp with time zone,
   onboarding_completed boolean default false,
   is_feed boolean default false,
   feed_category text,
